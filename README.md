@@ -7,3 +7,6 @@ puis les scripts d'installation des serveurs.
 - [`DECISIONS.md`](DECISIONS.md) — les choix d'architecture et pourquoi.
 - [`GUIDE-PAS-A-PAS.md`](GUIDE-PAS-A-PAS.md) — le guide de migration, phase par phase.
 - [`SUIVI.md`](SUIVI.md) — l'avancement.
+- [`scripts/backup-vps.sh`](scripts/backup-vps.sh) — sauvegarde nocturne chiffrée des sites du VPS OVH
+  vers Scaleway Object Storage, exécutée depuis le Beelink (`scripts/remote-dump.sh` est le
+  morceau qui tourne côté VPS, reçu par SSH). Aucun secret dans ces fichiers.
