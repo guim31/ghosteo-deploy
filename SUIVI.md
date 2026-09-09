@@ -9,13 +9,13 @@ Une nouvelle conversation commence par lire ce fichier.
 - [x] 0.2 Clé d'API Scaleway `beelink-migration` rangée dans `~/.config/scw/config.yaml` (09/09/2026) ; testée : Instances et DNS répondent, IAM refusé comme voulu
 - [x] 0.3 Clé SSH `beelink-claude` déployée sur le VPS (10/09/2026) : `ssh vito@51.178.87.41` fonctionne (pas root)
 - [x] 0.4 Permission Workflows accordée le 09/09/2026 (temporaire, à retirer fin de phase 1)
-- [x] 0 bis Sauvegarde nocturne des 10 sites vers Scaleway en place (10/09/2026)
+- [x] 0 bis Sauvegarde nocturne des 10 sites vers Scaleway en place (10/09/2026) ; second passage complet « sans erreur » à 00:14 après correctif de droits (lecture en sudo)
 - [x] 0.5 Formulation retenue par Guilhem le 09/09/2026 : « données hébergées en France, chiffrées, chez un hébergeur certifié ISO 27001 » — PR ouverte : https://github.com/guim31/ghosteoeu-main/pull/56 — **fusionnée le 10/09/2026**, à déployer depuis Vito (CGU/CGV : relecture juriste conseillée)
 
 ## Phase 1 — Image Docker
 
-- [ ] Dockerfile + docker.yml en PR sur `ghosteo`
-- [ ] Image testée (démarrage, installation, sauvegarde/restauration, hardware_id)
+- [~] Dockerfile + docker.yml + commande `app:copy-database` écrits sur la branche `feat/image-docker` (10/09/2026), PR à ouvrir après le test de copie
+- [x] Image construite sur le NAS (955 Mo) et testée le 10/09/2026 : démarrage, 64 migrations SQLite, `/up` 200, page d'installation servie, assets Vite présents, extensions gd/intl/bcmath/exif/gmp OK
 - [ ] Commande MySQL → SQLite écrite et testée sur données anonymisées
 - [ ] Tag de test posé, image présente sur ghcr (privée)
 - [ ] Permission Workflows retirée
