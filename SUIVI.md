@@ -5,8 +5,8 @@ Une nouvelle conversation commence par lire ce fichier.
 
 ## Phase 0 — Comptes et accès
 
-- [ ] 0.1 Compte Scaleway, projet `ghosteo`
-- [ ] 0.2 Clé d'API Scaleway rangée sur le Beelink et testée
+- [x] 0.1 Compte Scaleway existant (propriétaire depuis le 30/09/2025, e-mail guilhemhenry@gmail.com) — projet `ghosteo` à confirmer (ID attendu)
+- [x] 0.2 Clé d'API Scaleway `beelink-migration` rangée dans `~/.config/scw/config.yaml` (09/09/2026) ; testée : Instances et DNS répondent, IAM refusé comme voulu
 - [ ] 0.3 Clé SSH du Beelink acceptée par le VPS OVH (51.178.87.41)
 - [ ] 0.4 Permission Workflows accordée (temporaire)
 - [ ] 0.5 Formulation HDS de remplacement reçue
@@ -55,4 +55,8 @@ Une nouvelle conversation commence par lire ce fichier.
 
 ## Notes
 
-_(problèmes rencontrés, décisions prises en cours de route)_
+- 09/09/2026 : une ancienne clé API Scaleway (2025, sans expiration) servait à sauvegarder
+  les bases du VPS Vito vers Object Storage ; Guilhem ne sait pas si ça marche encore.
+  À vérifier depuis le VPS une fois l'accès SSH ouvert (phase 0.3), avant de la supprimer.
+- 09/09/2026 : la liste des buckets Object Storage répond `InvalidArgument` avec la
+  nouvelle clé ; à revoir quand le projet sera confirmé (projet favori de la clé).
