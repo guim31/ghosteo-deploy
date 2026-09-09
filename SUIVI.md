@@ -61,7 +61,11 @@ Une nouvelle conversation commence par lire ce fichier.
   guilhemhenry, xavierpages (7 instances clientes, Guilhem compris), ghosteoeudemo,
   ghosteoserver (ghosteo.eu), staging. Les sauvegardes locales `database_backups` datent
   de mars 2026 ; script `upload_backups_to_scaleway.sh` (rclone vers le bucket
-  `backup-vps-guilhemhenry-2023`) : état à vérifier.
+  `backup-vps-guilhemhenry-2023`) : **mort** — aucune config rclone pour `vito`, aucun cron,
+  `/home/DB_BACKUPS` vide, aucun dump de moins de 7 jours lisible. Reste à vérifier la
+  page Backups de Vito (sauvegardes envoyées directement à un Storage Provider), que
+  seul le panneau montre. ⚠️ Tant que ce n'est pas confirmé, considérer qu'il n'y a pas
+  de sauvegarde quotidienne des clients.
 
 - 09/09/2026 : prix Scaleway relevés par l'API (fr-par-1, HT/mois) : DEV1-M 3 vCPU 4 Go
   14,74 € (serveur de contrôle) ; DEV1-L 4 vCPU 8 Go 31,27 € (worker). Total attendu ≈ 46 €.
