@@ -14,9 +14,9 @@ Une nouvelle conversation commence par lire ce fichier.
 
 ## Phase 1 — Image Docker
 
-- [~] Dockerfile + docker.yml + commande `app:copy-database` écrits sur la branche `feat/image-docker` (10/09/2026), PR à ouvrir après le test de copie
+- [x] Dockerfile + docker.yml + commande `app:copy-database` : **PR ouverte** https://github.com/guim31/ghosteo/pull/192 (10/09/2026, vers `develop`)
 - [x] Image construite sur le NAS (955 Mo) et testée le 10/09/2026 : démarrage, 64 migrations SQLite, `/up` 200, page d'installation servie, assets Vite présents, extensions gd/intl/bcmath/exif/gmp OK
-- [ ] Commande MySQL → SQLite écrite et testée sur données anonymisées
+- [x] Commande MySQL → SQLite testée sur le dump anonymisé de staging (10/09/2026) : 52 188 lignes / 30 tables, comptes identiques, déchiffrement OK, redémarrage sans perte (volume + hardware_id)
 - [ ] Tag de test posé, image présente sur ghcr (privée)
 - [ ] Permission Workflows retirée
 
