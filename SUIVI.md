@@ -9,7 +9,7 @@ Une nouvelle conversation commence par lire ce fichier.
 - [x] 0.2 Clé d'API Scaleway `beelink-migration` rangée dans `~/.config/scw/config.yaml` (09/09/2026) ; testée : Instances et DNS répondent, IAM refusé comme voulu
 - [ ] 0.3 Clé SSH `beelink-claude` enregistrée dans Vito (Settings → SSH Keys, 09/09/2026) mais **pas encore déployée sur le serveur** : connexion refusée
 - [x] 0.4 Permission Workflows accordée le 09/09/2026 (temporaire, à retirer fin de phase 1)
-- [x] 0.5 Formulation retenue par Guilhem le 09/09/2026 : « données hébergées en France, chiffrées, chez un hébergeur certifié ISO 27001 » — PR à ouvrir sur `ghosteoeu-main`
+- [x] 0.5 Formulation retenue par Guilhem le 09/09/2026 : « données hébergées en France, chiffrées, chez un hébergeur certifié ISO 27001 » — PR ouverte : https://github.com/guim31/ghosteoeu-main/pull/56 (CGU/CGV : relecture juriste conseillée)
 
 ## Phase 1 — Image Docker
 
