@@ -7,7 +7,7 @@ Une nouvelle conversation commence par lire ce fichier.
 
 - [x] 0.1 Compte Scaleway existant (propriétaire depuis le 30/09/2025, e-mail guilhemhenry@gmail.com) — organisation `80540c15-2a31-4b57-ac2e-9e213936f859`, projet `ghosteo` = `a92ff601-e329-491e-87a3-4e3888a744aa`
 - [x] 0.2 Clé d'API Scaleway `beelink-migration` rangée dans `~/.config/scw/config.yaml` (09/09/2026) ; testée : Instances et DNS répondent, IAM refusé comme voulu
-- [ ] 0.3 Clé SSH `beelink-claude` enregistrée dans Vito (Settings → SSH Keys, 09/09/2026) mais **pas encore déployée sur le serveur** : connexion refusée
+- [x] 0.3 Clé SSH `beelink-claude` déployée sur le VPS (10/09/2026) : `ssh vito@51.178.87.41` fonctionne (pas root)
 - [x] 0.4 Permission Workflows accordée le 09/09/2026 (temporaire, à retirer fin de phase 1)
 - [x] 0.5 Formulation retenue par Guilhem le 09/09/2026 : « données hébergées en France, chiffrées, chez un hébergeur certifié ISO 27001 » — PR ouverte : https://github.com/guim31/ghosteoeu-main/pull/56 (CGU/CGV : relecture juriste conseillée)
 
@@ -54,6 +54,14 @@ Une nouvelle conversation commence par lire ce fichier.
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
 
 ## Notes
+
+- 10/09/2026 : inventaire du VPS OVH (vps-fdce4053, 6 vCPU, 11 Go, 96 Go disque à 44 %,
+  PHP 8.4, MySQL 8.4, Node 22). Utilisateurs isolés = un par site : alexiagauthier,
+  anaisdelaunay, aurelienmariejoseph, cabinet-blachon-thivillier, cedricrousseau,
+  guilhemhenry, xavierpages (7 instances clientes, Guilhem compris), ghosteoeudemo,
+  ghosteoserver (ghosteo.eu), staging. Les sauvegardes locales `database_backups` datent
+  de mars 2026 ; script `upload_backups_to_scaleway.sh` (rclone vers le bucket
+  `backup-vps-guilhemhenry-2023`) : état à vérifier.
 
 - 09/09/2026 : prix Scaleway relevés par l'API (fr-par-1, HT/mois) : DEV1-M 3 vCPU 4 Go
   14,74 € (serveur de contrôle) ; DEV1-L 4 vCPU 8 Go 31,27 € (worker). Total attendu ≈ 46 €.
