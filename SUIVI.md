@@ -5,11 +5,11 @@ Une nouvelle conversation commence par lire ce fichier.
 
 ## Phase 0 — Comptes et accès
 
-- [x] 0.1 Compte Scaleway existant (propriétaire depuis le 30/09/2025, e-mail guilhemhenry@gmail.com) — projet `ghosteo` à confirmer (ID attendu)
+- [x] 0.1 Compte Scaleway existant (propriétaire depuis le 30/09/2025, e-mail guilhemhenry@gmail.com) — organisation `80540c15-2a31-4b57-ac2e-9e213936f859`, projet `ghosteo` = `a92ff601-e329-491e-87a3-4e3888a744aa`
 - [x] 0.2 Clé d'API Scaleway `beelink-migration` rangée dans `~/.config/scw/config.yaml` (09/09/2026) ; testée : Instances et DNS répondent, IAM refusé comme voulu
-- [ ] 0.3 Clé SSH du Beelink acceptée par le VPS OVH (51.178.87.41)
-- [ ] 0.4 Permission Workflows accordée (temporaire)
-- [ ] 0.5 Formulation HDS de remplacement reçue
+- [ ] 0.3 Clé SSH `beelink-claude` enregistrée dans Vito (Settings → SSH Keys, 09/09/2026) mais **pas encore déployée sur le serveur** : connexion refusée
+- [x] 0.4 Permission Workflows accordée le 09/09/2026 (temporaire, à retirer fin de phase 1)
+- [x] 0.5 Formulation retenue par Guilhem le 09/09/2026 : « données hébergées en France, chiffrées, chez un hébergeur certifié ISO 27001 » — PR à ouvrir sur `ghosteoeu-main`
 
 ## Phase 1 — Image Docker
 
@@ -54,6 +54,9 @@ Une nouvelle conversation commence par lire ce fichier.
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
 
 ## Notes
+
+- 09/09/2026 : prix Scaleway relevés par l'API (fr-par-1, HT/mois) : DEV1-M 3 vCPU 4 Go
+  14,74 € (serveur de contrôle) ; DEV1-L 4 vCPU 8 Go 31,27 € (worker). Total attendu ≈ 46 €.
 
 - 09/09/2026 : une ancienne clé API Scaleway (2025, sans expiration) servait à sauvegarder
   les bases du VPS Vito vers Object Storage ; Guilhem ne sait pas si ça marche encore.
