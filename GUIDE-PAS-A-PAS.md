@@ -152,9 +152,11 @@ Je peux lister ton projet Scaleway, entrer sur le VPS OVH, et écrire un workflo
 1. **Relis et fusionne la pull request** quand la CI est verte. Tu n'as pas besoin de
    comprendre le contenu ; tu vérifies que les tests passent et que je t'ai expliqué le
    changement en français.
-2. Quand je te le demande, **pose un tag de test** `v1.x.y-docker.1` : Actions →
-   « Tag de version » → *Run workflow* → version. Ça déclenche la construction de
-   l'image. Un tag de test ne déploie rien chez personne.
+2. Quand je te le demande, **lance une image d'essai** : onglet Actions du dépôt
+   `ghosteo` → workflow « Image Docker » → *Run workflow* → branche `develop`, champ
+   tag : `essai-1`. Ça construit et publie l'image sans poser de version. Une image
+   d'essai ne déploie rien chez personne ; les vraies versions suivront les tags
+   `vX.Y.Z` posés par la livraison habituelle.
 3. Remets la permission **Workflows** à *No access* (étape 0.4 à l'envers).
 
 ### ✅ Fin de phase 1

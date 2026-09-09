@@ -14,10 +14,10 @@ Une nouvelle conversation commence par lire ce fichier.
 
 ## Phase 1 — Image Docker
 
-- [x] Dockerfile + docker.yml + commande `app:copy-database` : **PR ouverte** https://github.com/guim31/ghosteo/pull/192 (10/09/2026, vers `develop`)
+- [x] Dockerfile + docker.yml + commande `app:copy-database` : **PR ouverte** https://github.com/guim31/ghosteo/pull/192 (10/09/2026, vers `develop`) — CI verte ; réplique locale de la CI sur le NAS : Pint 288 fichiers OK, Pest 412 tests OK (les 5 échecs venaient d'un oubli de synchronisation, pas du code)
 - [x] Image construite sur le NAS (955 Mo) et testée le 10/09/2026 : démarrage, 64 migrations SQLite, `/up` 200, page d'installation servie, assets Vite présents, extensions gd/intl/bcmath/exif/gmp OK
 - [x] Commande MySQL → SQLite testée sur le dump anonymisé de staging (10/09/2026) : 52 188 lignes / 30 tables, comptes identiques, déchiffrement OK, redémarrage sans perte (volume + hardware_id)
-- [ ] Tag de test posé, image présente sur ghcr (privée)
+- [ ] Image d'essai `essai-1` publiée sur ghcr par le workflow « Image Docker » (à lancer par Guilhem après fusion de la PR, branche `develop`)
 - [ ] Permission Workflows retirée
 
 ## Phase 2 — Serveur de contrôle
