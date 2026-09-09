@@ -79,6 +79,5 @@ Une nouvelle conversation commence par lire ce fichier.
 
 - 09/09/2026 : une ancienne clé API Scaleway (2025, sans expiration) servait à sauvegarder
   les bases du VPS Vito vers Object Storage ; Guilhem ne sait pas si ça marche encore.
-  À vérifier depuis le VPS une fois l'accès SSH ouvert (phase 0.3), avant de la supprimer.
-- 09/09/2026 : la liste des buckets Object Storage répond `InvalidArgument` avec la
-  nouvelle clé ; à revoir quand le projet sera confirmé (projet favori de la clé).
+  Vérifié le 10/09 : le mécanisme était mort (voir ci-dessus).
+- 09/09/2026 : l'ancienne clé API Scaleway de 2025 a été supprimée par Guilhem le 09/09 au soir.
