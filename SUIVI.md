@@ -100,6 +100,22 @@ Admin, réactivé à la main le 10/09/2026 : il était `active=0` dans les donn�
 mot de passe commun de l'anonymisation communiqué à Guilhem dans la conversation, à changer
 depuis l'application.
 
+### Retours de la recette (après clôture)
+
+- 10/09/2026 : **connexion OK** (Guilhem, `utilisateur2`). **Lenteurs** signalées sur
+  Comptabilité → À pointer (mesuré : 80 s) et Statistiques (> 100 s, 504). Cause : **SQLite
+  n'indexe pas les clés étrangères**, contrairement à InnoDB ; les `whereHas('comptabilite')`
+  parcouraient toute la table. 26 index créés sur le staging → À pointer 0,4 s, Statistiques
+  2,8 à 3,1 s (le reste : treize comptages par tranche d'âge, un par requête, à optimiser
+  dans le code, valable aussi sous MySQL). Correctif durable : PR
+  https://github.com/guim31/ghosteo/pull/195 (migration SQLite seulement, testée dans le
+  conteneur). Deux index composites d'essai ajoutés à la main sur le staging
+  (`comptabilites(consultation_id, visible, deleted_at)`, `consultations(patient_id, date)`),
+  gain marginal, non repris dans la PR. Les pics à 13 s observés pendant l'analyse venaient
+  de mes propres tests concurrents (verrou d'écriture WAL), pas de l'application.
+  **Point de vigilance pour la décision SQLite** (DECISIONS § 7.3) : validé pour le volume
+  d'un cabinet, à condition que cette migration soit dans l'image déployée.
+
 ## Phase 3 — Back-office
 
 - [ ] PR `ghosteoeu-main` (serveurs, DokployClient, étapes, DNS) fusionnée
