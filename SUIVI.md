@@ -134,11 +134,25 @@ Contexte utile (état au 10/09/2026) :
 - [x] **PR ouverte** le 10/09/2026 : https://github.com/guim31/ghosteoeu-main/pull/57 — serveurs,
   `DokployClient`, moteurs `VitoBackend`/`DokployBackend` derrière `DeploymentBackend`, étape DNS
   (manuel / Scaleway), gabarits .env et compose, réglages. Pint, PHPStan, 409 tests verts sur le NAS.
-- [ ] PR fusionnée et ghosteo.eu redéployé depuis Vito (bouton Deploy, Guilhem)
-- [ ] Réglages Dokploy saisis dans l'admin (Guilhem : URL + jeton ; moi : le reste par ses indications)
-- [ ] Serveur `control-01` déclaré dans Réglages → Serveurs
-- [ ] Client fictif déployé puis supprimé trois fois
-- [ ] PR suivante : cascade de mise à jour des instances Dokploy (changer le tag, redéployer)
+- [x] PR #57 fusionnée (squash) et ghosteo.eu redéployé depuis Vito par Guilhem le 10/09/2026 ;
+  migrations jouées (tables `servers`, colonnes `backend`…).
+- [x] Réglages Dokploy : URL + jeton saisis par Guilhem ; environnement `pC_5KlfCgctYLUpawSQS3`,
+  image par défaut `ghcr.io/guim31/ghosteo:essai-2` et mode DNS « manuel » posés par tinker
+  (`sudo -u ghosteoserver php artisan tinker --execute`, l'utilisateur `vito` a sudo). Le
+  panneau répond v0.30.6 depuis le back-office.
+- [x] Serveur `control-01` déclaré (#1, Dokploy, machine du panneau, 51.158.96.49, plafond 3).
+- [x] **Client fictif `test-migration.ghosteoapp.eu` déployé puis supprimé trois fois** le
+  10/09/2026 (enregistrement A saisi par Guilhem chez OVH). Les trois passages : succès de bout
+  en bout (DNS → application → variables → domaine → déploiement → conteneurs → HTTPS 200 →
+  fin), ~8 min chacun au rythme du planificateur (une étape par minute), sans licence donc sans
+  inscription au moniteur. Suppression : `compose.delete` (volumes compris) + lignes du
+  back-office ; zéro conteneur, zéro volume restant. Scripts jetables dans `/tmp` du Beelink.
+- [x] **PR #58 ouverte** : cascade de mise à jour des instances Dokploy (image cible,
+  remplacement de `GHOSTEO_IMAGE`, `compose.redeploy`, suivi) — 413 tests, PHPStan et Pint verts.
+  À fusionner et déployer depuis Vito, puis test réel : redéployer le staging par la cascade.
+
+**Phase 3 close le 10/09/2026, sous réserve de la fusion de la PR #58.**
+
 
 ## Phase 4 — DNS, worker, démo
 
