@@ -147,11 +147,15 @@ Contexte utile (état au 10/09/2026) :
   fin), ~8 min chacun au rythme du planificateur (une étape par minute), sans licence donc sans
   inscription au moniteur. Suppression : `compose.delete` (volumes compris) + lignes du
   back-office ; zéro conteneur, zéro volume restant. Scripts jetables dans `/tmp` du Beelink.
-- [x] **PR #58 ouverte** : cascade de mise à jour des instances Dokploy (image cible,
-  remplacement de `GHOSTEO_IMAGE`, `compose.redeploy`, suivi) — 413 tests, PHPStan et Pint verts.
-  À fusionner et déployer depuis Vito, puis test réel : redéployer le staging par la cascade.
+- [x] **PR #58 fusionnée** et déployée par Guilhem le 10/09/2026 : cascade de mise à jour des
+  instances Dokploy (image cible, remplacement de `GHOSTEO_IMAGE`, `compose.redeploy`, suivi).
+- [x] **Cascade testée en réel sur le staging** (instance #10 rattachée à control-01 et à son
+  compose) : `essai-2 → essai-1` en 1 min, puis retour `essai-1 → essai-2` en 1 min ; à chaque
+  fois 5 034 patients, `hardware_id` et licence intacts, ressources en HTTPS après le retour.
+  Le retour arrière est bien « la même cascade avec le tag précédent ».
 
-**Phase 3 close le 10/09/2026, sous réserve de la fusion de la PR #58.**
+**✅ Phase 3 close le 10/09/2026.** Depuis l'admin de ghosteo.eu : un clic crée une instance
+sur Scaleway (DNS à poser à la main jusqu'à la phase 4), un clic la met à jour.
 
 
 ## Phase 4 — DNS, worker, démo
