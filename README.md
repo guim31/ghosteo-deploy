@@ -17,3 +17,5 @@ puis les scripts d'installation des serveurs.
   La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink.
 - [`compose/instance.yml`](compose/instance.yml) — gabarit d'une instance GHosteo sur Dokploy
   (web, scheduler, queue, un volume) ; `scripts/dokploy.py` est le mini client de l'API Dokploy.
+- [`scripts/dns-scaleway.py`](scripts/dns-scaleway.py) — recopie l'export de zone OVH (`dns/`) chez Scaleway
+  Domains & DNS et compare les réponses des deux annuaires avant le changement de serveurs de noms.

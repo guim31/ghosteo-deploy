@@ -171,6 +171,12 @@ Contexte utile (état au 10/09/2026) :
   réglages de ghosteo.eu et y saisir un jeton Scaleway DNS (ou réutiliser la clé du Beelink ?
   non : une clé dédiée, périmètre DNS seulement).
 
+- [~] 10/09/2026 : `ghosteoapp.eu` déclaré chez Scaleway comme **domaine externe** (statut
+  `checking`). Scaleway ne crée la zone qu'après une preuve de propriété : un TXT
+  `_scaleway-challenge.ghosteoapp.eu` = `d97bbb2a-6689-4092-9094-da451f56d4b1` à poser chez OVH
+  (Guilhem). Le guide ne prévoyait pas cette étape. Une fois le domaine `active`, la zone se
+  recopie et se vérifie avec `scripts/dns-scaleway.py push|compare dns/…zone` (SOA/NS exclus,
+  MX avec priorité, joker `*` compris). Ce TXT peut être retiré d'OVH après validation.
 - [ ] Zone `ghosteoapp.eu` recopiée chez Scaleway et vérifiée
 - [ ] Serveurs DNS changés chez OVH, propagation constatée
 - [ ] `worker-01` créé et attaché
