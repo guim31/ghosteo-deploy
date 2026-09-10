@@ -9,9 +9,15 @@
 Le fichier de zone est l'export « mode textuel » d'OVH. Les lignes SOA et NS sont ignorées
 (propres à l'hébergeur). Une ligne dont le nom est vide hérite du nom précédent (« @ »).
 Aucun secret : la clé d'API est lue par scw.py dans ~/.config/scw/config.yaml.
+
+ATTENTION : « compare » ne vaut rien depuis le réseau de la maison, où toute requête DNS
+vers un serveur externe est interceptée par le résolveur local (réponses non autoritaires,
+REFUSED sans récursion). Le lancer depuis control-01 (scp du script, de scw.py et du
+fichier de zone dans /tmp, puis python3 dns-scaleway.py compare …).
 """
 import os
 import random
+import re
 import string
 import subprocess
 import sys
@@ -91,11 +97,20 @@ def push(path):
 
 
 def dig(name, rtype, server):
+    """Réponse autoritaire (drapeau « aa ») du serveur, triée ; « NON AUTORITAIRE »
+    si le serveur répond sans porter la zone (recursion, cache, zone pas publiée)."""
     out = subprocess.run(
-        ["dig", "+short", "+norecurse", "+time=5", "+tries=2", rtype, name, f"@{server}"],
+        ["dig", "+norecurse", "+time=5", "+tries=2", rtype, name, f"@{server}"],
         capture_output=True, text=True,
     ).stdout
-    return sorted(line.strip().lower() for line in out.splitlines() if line.strip())
+    if not re.search(r"flags:[^;]*\baa\b", out):
+        return ["NON AUTORITAIRE"]
+    answers = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[0].rstrip(".").lower() == name.lower() and parts[2] == "IN" and parts[3] == rtype:
+            answers.append(" ".join(parts[4:]).lower())
+    return sorted(answers)
 
 
 def compare(path):
