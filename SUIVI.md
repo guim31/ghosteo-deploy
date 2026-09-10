@@ -96,8 +96,9 @@ Contexte utile pour démarrer (état au 10/09/2026) :
   redéployer.
 
 **✅ Phase 2 close le 10/09/2026.** Compte de recette : `utilisateur1@example.invalid` (Super
-Admin), mot de passe commun de l'anonymisation communiqué à Guilhem dans la conversation, à
-changer depuis l'application.
+Admin, réactivé à la main le 10/09/2026 : il était `active=0` dans les données d'origine),
+mot de passe commun de l'anonymisation communiqué à Guilhem dans la conversation, à changer
+depuis l'application.
 
 ## Phase 3 — Back-office
 
