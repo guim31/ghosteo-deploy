@@ -17,10 +17,35 @@ Une nouvelle conversation commence par lire ce fichier.
 - [x] Dockerfile + docker.yml + commande `app:copy-database` : **PR ouverte** https://github.com/guim31/ghosteo/pull/192 (10/09/2026, vers `develop`) — CI verte ; réplique locale de la CI sur le NAS : Pint 288 fichiers OK, Pest 417 tests OK
 - [x] Image construite sur le NAS (955 Mo) et testée le 10/09/2026 : démarrage, 64 migrations SQLite, `/up` 200, page d'installation servie, assets Vite présents, extensions gd/intl/bcmath/exif/gmp OK
 - [x] Commande MySQL → SQLite testée sur le dump anonymisé de staging (10/09/2026) : 52 188 lignes / 30 tables, comptes identiques, déchiffrement OK, redémarrage sans perte (volume + hardware_id)
-- [ ] Image d'essai `essai-1` publiée sur ghcr par le workflow « Image Docker » (à lancer par Guilhem après fusion de la PR, branche `develop`)
-- [ ] Permission Workflows retirée
+- [x] PR #192 fusionnée dans `develop` et PR #193 (workflow sur `main`) fusionnée ; image d'essai **`ghcr.io/guim31/ghosteo:essai-1`** publiée par Guilhem le 10/09/2026 (package privé)
+- [x] Permission Workflows retirée du jeton GitHub (10/09/2026)
+- [x] Formulation HDS déployée sur ghosteo.eu depuis Vito (10/09/2026)
+- [x] Banc d'essai du NAS démonté (dump anonymisé supprimé, images `ghosteo:essai-*` conservées dans `/mnt/user/appdata/ghosteo-build/`)
 
 ## Phase 2 — Serveur de contrôle
+
+Contexte utile pour démarrer (état au 10/09/2026) :
+- Clé Scaleway : `~/.config/scw/config.yaml` (access/secret, org, projet `ghosteo`, fr-par-1),
+  application IAM `beelink-migration` avec Instances, Block Storage, DNS et Object Storage
+  sur le seul projet `ghosteo` ; pas de droit IAM ni Projets (normal).
+- Prix relevés : DEV1-M (3 vCPU, 4 Go) 14,74 € HT/mois pour `control-01`.
+- L'image à déployer sur staging : `ghcr.io/guim31/ghosteo:essai-1`, privée. Dokploy aura
+  besoin d'un jeton GitHub classique `read:packages` saisi par Guilhem dans son UI.
+- Rôles d'une instance : `web` (commande par défaut, AUTORUN migrations), `scheduler`
+  (`php artisan schedule:work`, AUTORUN_ENABLED=false), `queue` (`php artisan queue:work`,
+  AUTORUN_ENABLED=false) ; volume `/var/www/html/storage` ; SQLite via
+  `DB_CONNECTION=sqlite`, `DB_DATABASE=/var/www/html/storage/app/database.sqlite`.
+- Le gabarit de `.env` de production est dans `ghosteoeu-main`
+  (`EnvFileGenerator::defaultTemplate()`) et dans `ghosteo/.env.production.example`.
+- `panel.ghosteo.eu` : la zone `ghosteo.eu` reste chez OVH ; l'enregistrement A vers
+  l'IP de `control-01` est à saisir par Guilhem dans l'espace client OVH (je lui dicte).
+- `staging.ghosteoapp.eu` pointe aujourd'hui vers le VPS OVH via le joker ; pour tester
+  staging sur Dokploy avant la phase 4, utiliser un nom hors joker (ex. `staging2`
+  n'existe pas : le joker attrape tout) → un enregistrement A explicite chez OVH,
+  `staging-scw.ghosteoapp.eu`, saisi par Guilhem.
+- Clones de travail : `~/homelab/ghosteo-work/ghosteo` (develop) et `~/homelab/ghosteo-work/ghosteoeu-main` (main).
+- Beelink : ni php, ni composer, ni accès docker ; le NAS (`ssh NASDOURY`) sert de banc d'essai Docker.
+
 
 - [ ] `control-01` créé chez Scaleway
 - [ ] Dokploy installé, compte admin créé par Guilhem, 2FA
