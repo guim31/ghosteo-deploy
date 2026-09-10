@@ -1,0 +1,105 @@
+#cloud-config
+# Serveur de contrôle GHosteo (Dokploy) — Scaleway, Ubuntu 24.04.
+# Appliqué une seule fois, au premier démarrage, par scripts/create-server.py.
+# Aucun secret ici : la clé ci-dessous est la clé PUBLIQUE du Beelink.
+#
+# Ce que fait ce fichier :
+#   - accès SSH root par clé uniquement (mot de passe refusé)
+#   - fuseau Europe/Paris, 2 Go de swap (la machine n'en a pas par défaut)
+#   - mises à jour de sécurité automatiques, sans redémarrage automatique
+#   - fail2ban sur SSH
+#   - ufw : 22, 80, 443 ouverts, tout le reste refusé pour les services de l'hôte.
+#     ATTENTION : ufw ne gouverne PAS les ports publiés par Docker (dont le 3000 de
+#     Dokploy). C'est le groupe de sécurité Scaleway, posé par create-server.py, qui
+#     protège ceux-là.
+#   - Dokploy, version épinglée (DOKPLOY_VERSION ci-dessous), journal dans
+#     /var/log/dokploy-install.log
+
+hostname: control-01
+timezone: Europe/Paris
+locale: fr_FR.UTF-8
+
+disable_root: false
+ssh_pwauth: false
+users:
+  - name: root
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBwYEdQt8PyRd99XShvNtmfLz8jasK2VCrXsfCW9yESd claude@guilhem-MINI-S
+
+package_update: true
+package_upgrade: true
+packages:
+  - ca-certificates
+  - curl
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+  - apt-listchanges
+
+swap:
+  filename: /swapfile
+  size: 2G
+  maxsize: 2G
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/90-ghosteo.conf
+    permissions: "0644"
+    content: |
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      X11Forwarding no
+  - path: /etc/fail2ban/jail.d/sshd.local
+    permissions: "0644"
+    content: |
+      [sshd]
+      enabled = true
+      backend = systemd
+      maxretry = 5
+      findtime = 10m
+      bantime = 1h
+  - path: /etc/apt/apt.conf.d/52-ghosteo-unattended.conf
+    permissions: "0644"
+    content: |
+      // Mises à jour de sécurité seules, pas de redémarrage automatique :
+      // un redémarrage du serveur de contrôle se décide, il ne se subit pas.
+      Unattended-Upgrade::Automatic-Reboot "false";
+      Unattended-Upgrade::Remove-Unused-Dependencies "true";
+      APT::Periodic::Update-Package-Lists "1";
+      APT::Periodic::Unattended-Upgrade "1";
+      APT::Periodic::AutocleanInterval "7";
+  - path: /etc/sysctl.d/90-ghosteo.conf
+    permissions: "0644"
+    content: |
+      vm.swappiness = 10
+  - path: /usr/local/sbin/install-dokploy.sh
+    permissions: "0755"
+    content: |
+      #!/bin/bash
+      # Installe Dokploy à une version fixe. Rejouable : ne fait rien si déjà installé.
+      set -euo pipefail
+      DOKPLOY_VERSION="v0.30.6"
+      if docker service ls --format '{{.Name}}' 2>/dev/null | grep -qx dokploy; then
+        echo "Dokploy déjà installé, rien à faire."
+        exit 0
+      fi
+      export DOKPLOY_VERSION
+      curl -fsSL https://dokploy.com/install.sh -o /root/dokploy-install.sh
+      bash /root/dokploy-install.sh
+
+runcmd:
+  - sysctl --system
+  - systemctl restart ssh
+  - systemctl enable --now fail2ban
+  # Pare-feu de l'hôte, activé AVANT Docker pour ne pas écraser ses règles.
+  - ufw default deny incoming
+  - ufw default allow outgoing
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+  - ufw allow 443/tcp
+  - ufw allow 443/udp
+  - ufw --force enable
+  - /usr/local/sbin/install-dokploy.sh > /var/log/dokploy-install.log 2>&1
+  - touch /var/lib/cloud/ghosteo-control-ready
+
+final_message: "control-01 prêt après $UPTIME s (cloud-init $VERSION)"
