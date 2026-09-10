@@ -83,15 +83,21 @@ Contexte utile pour démarrer (état au 10/09/2026) :
   **anonymisée** (`db:anonymize`, 5 043 patients, licence neutralisée), copiée en SQLite
   (`app:copy-database --fresh`, 52 178 lignes / 30 tables), puis MySQL, dump et mots de passe
   temporaires supprimés. Documents patients non restaurés (réels). `/up` 200, migrations à jour.
-- [ ] **Redirections en `http://`** : Laravel ne fait pas confiance au proxy (aucun `trustProxies`).
-  PR https://github.com/guim31/ghosteo/pull/194 (variable `TRUSTED_PROXIES`, déjà à `*` dans
-  les variables du staging). À fusionner, puis image d'essai `essai-2` à publier par Guilhem.
-- [ ] Licence de recette pour `staging-scw.ghosteoapp.eu` (dédiée, interne, avec expiration :
-  `docs/WORKFLOW-GIT.md` § « Donner une licence à la recette ») — à émettre par Guilhem dans
-  ghosteo.eu ; sans elle toutes les pages renvoient vers « licence invalide ».
-- [ ] Deux redéploiements validés (essai-2 puis un autre) : changer `GHOSTEO_IMAGE` dans les
-  variables du service et `compose.redeploy` ; vérifier que le volume (base SQLite,
-  `hardware_id`) survit.
+- [x] Redirections et ressources en `http://` (CSS bloqué par le navigateur) : PR
+  https://github.com/guim31/ghosteo/pull/194 fusionnée par Guilhem, image `essai-2` publiée,
+  `TRUSTED_PROXIES=*` dans les variables du staging. Vérifié : redirections et CSS en `https://`.
+- [x] Licence de recette émise par Guilhem dans ghosteo.eu (« Staging SCALEWAY », Pro, expire le
+  01/01/2027), enregistrée dans l'instance le 10/09/2026 : statut `active`, `hardware_id` généré
+  (`94cb7637…`) dans le volume.
+- [x] **Deux redéploiements validés** le 10/09/2026 : n°1 `essai-1 → essai-2` (changement de
+  `GHOSTEO_IMAGE` + `compose.redeploy`, ~60 s), n°2 même image. À chaque fois : base SQLite
+  (5 034 patients), `hardware_id` et licence intacts, `/login` 200. Le cycle « nouveau tag →
+  redéploiement » est donc : modifier `GHOSTEO_IMAGE` dans les variables du service, puis
+  redéployer.
+
+**✅ Phase 2 close le 10/09/2026.** Compte de recette : `utilisateur1@example.invalid` (Super
+Admin), mot de passe commun de l'anonymisation communiqué à Guilhem dans la conversation, à
+changer depuis l'application.
 
 ## Phase 3 — Back-office
 
