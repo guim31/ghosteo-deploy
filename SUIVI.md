@@ -118,9 +118,27 @@ depuis l'application.
 
 ## Phase 3 — Back-office
 
-- [ ] PR `ghosteoeu-main` (serveurs, DokployClient, étapes, DNS) fusionnée
-- [ ] Réglages Dokploy saisis dans l'admin
+Contexte utile (état au 10/09/2026) :
+- Banc de test du NAS pour `ghosteoeu-main` : `/mnt/user/appdata/ghosteoeu-ci/src` (rsync depuis le
+  clone, sans `vendor`/`node_modules`/`public/build`), image `ghosteoeu-ci:php` (serversideup 8.3-cli
+  + bcmath/intl/gd), assets construits une fois avec `node:20-alpine`. Commande :
+  `docker run --rm --user root -v …/src:/app -w /app ghosteoeu-ci:php sh -c "vendor/bin/pint --test; php artisan test --compact; vendor/bin/phpstan analyse"`.
+  Sans assets, 32 tests échouent sur « Vite manifest not found » : ce n'est pas le code.
+- Identifiants Dokploy à saisir dans l'admin : URL `https://panel.ghosteo.eu`, environnement
+  `pC_5KlfCgctYLUpawSQS3` (projet `ghosteo`), image par défaut `ghcr.io/guim31/ghosteo:essai-2`
+  tant qu'aucune version taguée n'existe ; serveur `control-01` = machine du panneau
+  (identifiant vide), IP `51.158.96.49`.
+- Le mode DNS reste « manuel » jusqu'à la phase 4 : l'assistant vérifie et attend ; le client
+  fictif `test-migration.ghosteoapp.eu` demande donc un enregistrement A chez OVH (Guilhem).
+
+- [x] **PR ouverte** le 10/09/2026 : https://github.com/guim31/ghosteoeu-main/pull/57 — serveurs,
+  `DokployClient`, moteurs `VitoBackend`/`DokployBackend` derrière `DeploymentBackend`, étape DNS
+  (manuel / Scaleway), gabarits .env et compose, réglages. Pint, PHPStan, 409 tests verts sur le NAS.
+- [ ] PR fusionnée et ghosteo.eu redéployé depuis Vito (bouton Deploy, Guilhem)
+- [ ] Réglages Dokploy saisis dans l'admin (Guilhem : URL + jeton ; moi : le reste par ses indications)
+- [ ] Serveur `control-01` déclaré dans Réglages → Serveurs
 - [ ] Client fictif déployé puis supprimé trois fois
+- [ ] PR suivante : cascade de mise à jour des instances Dokploy (changer le tag, redéployer)
 
 ## Phase 4 — DNS, worker, démo
 
