@@ -57,14 +57,19 @@ Contexte utile pour démarrer (état au 10/09/2026) :
   ufw, fail2ban, mises à jour de sécurité auto sans reboot auto). Vérifié après un
   redémarrage : services `dokploy` et `dokploy-postgres` 1/1, Traefik répond sur 80/443,
   port 3000 fermé depuis le NAS du travail (autre IP) et ouvert depuis la maison.
-- [ ] Enregistrement A `panel.ghosteo.eu → 51.158.96.49` chez OVH (Guilhem), puis publication
-  HTTPS du panneau (moi, fichier Traefik `/etc/dokploy/traefik/dynamic/dokploy.yml` + e-mail
-  Let's Encrypt réel dans `traefik.yml`, le défaut `test@localhost.com` est refusé par LE)
+- [x] Enregistrements A `panel.ghosteo.eu` et `staging-scw.ghosteoapp.eu → 51.158.96.49` saisis
+  par Guilhem chez OVH le 10/09/2026 ; vérifié : ghosteo.eu, demo.ghosteoapp.eu, staging et les
+  instances clientes répondent toujours en 51.178.87.41 (la démo est `demo.ghosteoapp.eu`,
+  pas `demo.ghosteo.eu` comme l'écrit le guide).
+- [x] Panneau publié en HTTPS : **https://panel.ghosteo.eu**, certificat Let's Encrypt valide
+  jusqu'au 09/12/2026, HTTP redirigé. Fait à la main dans
+  `/etc/dokploy/traefik/dynamic/dokploy.yml` (le fichier que Dokploy réécrit quand on
+  renseigne *Settings → Server → Domain*) ; e-mail Let's Encrypt mis à guilhemhenry@gmail.com
+  dans `traefik.yml` (le défaut `test@localhost.com` est refusé par Let's Encrypt).
 - [ ] Compte admin Dokploy créé par Guilhem sur https://panel.ghosteo.eu/register, 2FA ; ensuite
   fermer la règle 3000 du groupe de sécurité
 - [ ] Jeton API Dokploy rangé sur le Beelink
 - [ ] Registre ghcr saisi dans Dokploy
-- [ ] Enregistrement A `staging-scw.ghosteoapp.eu → 51.158.96.49` chez OVH (Guilhem)
 - [ ] Staging déployé depuis l'image, deux redéploiements validés
 
 ## Phase 3 — Back-office
