@@ -184,7 +184,10 @@ Contexte utile (état au 10/09/2026) :
   le Beelink, toute requête DNS vers un serveur externe est interceptée par le résolveur de la
   maison (réponses non autoritaires, REFUSED sans récursion) — les vérifications DNS se font
   depuis control-01. Le TXT `_scaleway-challenge` peut maintenant être retiré chez OVH.
-- [ ] Serveurs DNS changés chez OVH, propagation constatée
+- [~] Serveurs DNS changés chez OVH par Guilhem le 10/09/2026 vers 15h20 (`ns0`/`ns1.dom.scw.cloud`,
+  sans IP associée ; OVH affiche « en cours d'activation »). Propagation surveillée depuis control-01
+  (registre `.eu` via `x.dns.eu`, Cloudflare, Google).
+- [ ] Propagation constatée
 - [ ] `worker-01` créé et attaché — préparé le 10/09/2026 : `cloud-init/worker.yaml` (durcissement
   seul, ni Docker ni Dokploy : c'est `server.setup` du panneau qui les installe),
   `create-server.py --ssh-from … --authorized-key …` (port 22 restreint au panneau et à la
