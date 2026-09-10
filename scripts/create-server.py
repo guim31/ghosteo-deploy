@@ -9,11 +9,13 @@ Ce que fait le script, dans l'ordre, et sans rien refaire si ça existe déjà :
      cette adresse ;
   2. une adresse IP fixe (« flexible ») au nom du serveur, pour que l'IP survive à une
      recréation de la machine ;
-  3. la machine, sur Ubuntu 24.04, disque local de 40 Go ;
+  3. la machine, sur Ubuntu 24.04, disque local de 40 Go, avec la clé SSH publique du
+     Beelink passée en tag AUTHORIZED_KEY (la section « users » de cloud-init n'est pas
+     appliquée à root sur les images Scaleway ; le tag, lui, est lu à chaque démarrage) ;
   4. le cloud-init injecté comme user_data, PUIS le démarrage.
 
 Le rôle est le mot avant le tiret du nom (control-01 → control). Aucun secret : la clé
-est lue par scw.py dans ~/.config/scw/config.yaml.
+d'API est lue par scw.py dans ~/.config/scw/config.yaml.
 """
 import argparse
 import json
@@ -29,6 +31,14 @@ ZONE = "fr-par-1"
 BASE = f"/instance/v1/zones/{ZONE}"
 UBUNTU_LABEL = "ubuntu_noble"
 ROOT_SIZE = 40_000_000_000  # 40 Go, plafond du disque local des DEV1
+SSH_PUBKEY = os.path.expanduser("~/.ssh/id_ed25519.pub")
+
+
+def authorized_key_tag():
+    """Tag Scaleway AUTHORIZED_KEY : la clé publique, espaces remplacés par des « _ »."""
+    with open(SSH_PUBKEY) as fh:
+        kind, key = fh.read().split()[:2]
+    return f"AUTHORIZED_KEY={kind}_{key}_beelink-claude"
 
 
 def die(msg, payload=None):
@@ -179,7 +189,7 @@ def main():
                 "project": project,
                 "commercial_type": args.commercial_type,
                 "image": image,
-                "tags": ["ghosteo", role],
+                "tags": ["ghosteo", role, authorized_key_tag()],
                 "security_group": sg_id,
                 "public_ips": [ip["id"]],
                 "dynamic_ip_required": False,

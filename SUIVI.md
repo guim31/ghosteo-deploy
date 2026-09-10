@@ -47,10 +47,24 @@ Contexte utile pour démarrer (état au 10/09/2026) :
 - Beelink : ni php, ni composer, ni accès docker ; le NAS (`ssh NASDOURY`) sert de banc d'essai Docker.
 
 
-- [ ] `control-01` créé chez Scaleway
-- [ ] Dokploy installé, compte admin créé par Guilhem, 2FA
+- [x] `control-01` créé chez Scaleway le 10/09/2026 : DEV1-M fr-par-1, Ubuntu 24.04, disque
+  local 40 Go, **IP fixe `51.158.96.49`** (réservée à part, survit à une recréation),
+  serveur `f28fa304-a7b3-4e5b-9a62-a11b0f2ea2ba`, groupe de sécurité `ghosteo-control`
+  (tout refusé sauf 22/80/443 ; **3000 ouvert uniquement depuis la maison, 82.66.175.113**).
+  Créé par `scripts/create-server.py control-01 DEV1-M cloud-init/control.yaml --panel-from <IP maison>`.
+  Alias SSH `control-01` (root) dans `~/.ssh/config` du Beelink.
+- [x] Dokploy **v0.30.6** installé par le cloud-init (Docker 28.5.0, Traefik v3.6.7, swap 2 Go,
+  ufw, fail2ban, mises à jour de sécurité auto sans reboot auto). Vérifié après un
+  redémarrage : services `dokploy` et `dokploy-postgres` 1/1, Traefik répond sur 80/443,
+  port 3000 fermé depuis le NAS du travail (autre IP) et ouvert depuis la maison.
+- [ ] Enregistrement A `panel.ghosteo.eu → 51.158.96.49` chez OVH (Guilhem), puis publication
+  HTTPS du panneau (moi, fichier Traefik `/etc/dokploy/traefik/dynamic/dokploy.yml` + e-mail
+  Let's Encrypt réel dans `traefik.yml`, le défaut `test@localhost.com` est refusé par LE)
+- [ ] Compte admin Dokploy créé par Guilhem sur https://panel.ghosteo.eu/register, 2FA ; ensuite
+  fermer la règle 3000 du groupe de sécurité
 - [ ] Jeton API Dokploy rangé sur le Beelink
 - [ ] Registre ghcr saisi dans Dokploy
+- [ ] Enregistrement A `staging-scw.ghosteoapp.eu → 51.158.96.49` chez OVH (Guilhem)
 - [ ] Staging déployé depuis l'image, deux redéploiements validés
 
 ## Phase 3 — Back-office
@@ -80,6 +94,17 @@ Contexte utile pour démarrer (état au 10/09/2026) :
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
 
 ## Notes
+
+- 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
+  pas donné accès à root : l'agent Scaleway (`scw-fetch-ssh-keys`) **régénère
+  `/root/.ssh/authorized_keys` à chaque démarrage** depuis les clés IAM du projet et les
+  tags `AUTHORIZED_KEY=<clé, espaces → _>` du serveur. La clé `beelink-migration` n'a pas le
+  droit d'écrire des clés IAM, donc `create-server.py` passe la clé publique du Beelink en
+  tag. Diagnostic sans SSH : Traefik sur 80/443 et Dokploy sur 3000 répondaient, donc le
+  cloud-init avait bien tourné ; un redémarrage après pose du tag a suffi.
+- 10/09/2026 : le Beelink n'a ni `scw` ni `jq` ; `scripts/scw.py` (bibliothèque standard
+  Python) sert de client d'API. Le DEV1-M coûte 0,0202 € HT/h ; l'IP fixe routée est
+  facturée en plus, quelques euros par mois.
 
 - 10/09/2026 : inventaire du VPS OVH (vps-fdce4053, 6 vCPU, 11 Go, 96 Go disque à 44 %,
   PHP 8.4, MySQL 8.4, Node 22). Utilisateurs isolés = un par site : alexiagauthier,

@@ -1,7 +1,12 @@
 #cloud-config
 # Serveur de contrôle GHosteo (Dokploy) — Scaleway, Ubuntu 24.04.
 # Appliqué une seule fois, au premier démarrage, par scripts/create-server.py.
-# Aucun secret ici : la clé ci-dessous est la clé PUBLIQUE du Beelink.
+# Aucun secret ici.
+#
+# La clé SSH du Beelink n'est PAS dans ce fichier : sur les images Scaleway, la section
+# « users » de cloud-init n'est pas appliquée à root (constaté le 10/09/2026). La clé est
+# passée par un tag AUTHORIZED_KEY=... sur le serveur, lu à chaque démarrage par l'agent
+# Scaleway (scw-fetch-ssh-keys → /root/.ssh/instance_keys). create-server.py s'en charge.
 #
 # Ce que fait ce fichier :
 #   - accès SSH root par clé uniquement (mot de passe refusé)
@@ -21,10 +26,6 @@ locale: fr_FR.UTF-8
 
 disable_root: false
 ssh_pwauth: false
-users:
-  - name: root
-    ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBwYEdQt8PyRd99XShvNtmfLz8jasK2VCrXsfCW9yESd claude@guilhem-MINI-S
 
 package_update: true
 package_upgrade: true
