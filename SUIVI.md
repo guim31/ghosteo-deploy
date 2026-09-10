@@ -66,11 +66,32 @@ Contexte utile pour démarrer (état au 10/09/2026) :
   `/etc/dokploy/traefik/dynamic/dokploy.yml` (le fichier que Dokploy réécrit quand on
   renseigne *Settings → Server → Domain*) ; e-mail Let's Encrypt mis à guilhemhenry@gmail.com
   dans `traefik.yml` (le défaut `test@localhost.com` est refusé par Let's Encrypt).
-- [ ] Compte admin Dokploy créé par Guilhem sur https://panel.ghosteo.eu/register, 2FA ; ensuite
-  fermer la règle 3000 du groupe de sécurité
-- [ ] Jeton API Dokploy rangé sur le Beelink
-- [ ] Registre ghcr saisi dans Dokploy
-- [ ] Staging déployé depuis l'image, deux redéploiements validés
+- [x] Compte admin Dokploy créé par Guilhem le 10/09/2026 (guilhemhenry@gmail.com), 2FA active ;
+  règle 3000 du groupe de sécurité supprimée, port fermé vérifié depuis la maison.
+- [x] Jeton API Dokploy rangé dans `~/.config/dokploy/token` (URL dans `url`, mode 600) ;
+  client `scripts/dokploy.py`. À révoquer et recréer en fin de migration.
+- [x] Registre ghcr saisi par Guilhem dans Dokploy (`ghcr.io`, `guim31`, id `R9TYou4Y3PHTOnx0e2G4K`) ;
+  l'image privée `essai-1` a été tirée sans intervention.
+- [x] **Staging déployé** le 10/09/2026 : projet Dokploy `ghosteo` (`LKeYTUy0wxWGmspCL908p`,
+  environnement `production` `pC_5KlfCgctYLUpawSQS3`), service compose `staging`
+  (`jeA57LQPy2ASqs0EXNDV1`, appName `ghosteo-staging-oygder`), gabarit `compose/instance.yml`
+  (web + scheduler + queue, volume `ghosteo-staging-oygder_storage`), domaine
+  **https://staging-scw.ghosteoapp.eu** (Let's Encrypt OK). Variables = `.env` du staging OVH
+  adapté (SQLite dans le volume, `QUEUE_CONNECTION=database`, journaux stderr), copie de
+  travail dans `/dev/shm/ghosteo/` du Beelink (tmpfs), référence dans Dokploy.
+  Données : sauvegarde du 10/09 du staging OVH chargée dans un MySQL temporaire sur control-01,
+  **anonymisée** (`db:anonymize`, 5 043 patients, licence neutralisée), copiée en SQLite
+  (`app:copy-database --fresh`, 52 178 lignes / 30 tables), puis MySQL, dump et mots de passe
+  temporaires supprimés. Documents patients non restaurés (réels). `/up` 200, migrations à jour.
+- [ ] **Redirections en `http://`** : Laravel ne fait pas confiance au proxy (aucun `trustProxies`).
+  PR https://github.com/guim31/ghosteo/pull/194 (variable `TRUSTED_PROXIES`, déjà à `*` dans
+  les variables du staging). À fusionner, puis image d'essai `essai-2` à publier par Guilhem.
+- [ ] Licence de recette pour `staging-scw.ghosteoapp.eu` (dédiée, interne, avec expiration :
+  `docs/WORKFLOW-GIT.md` § « Donner une licence à la recette ») — à émettre par Guilhem dans
+  ghosteo.eu ; sans elle toutes les pages renvoient vers « licence invalide ».
+- [ ] Deux redéploiements validés (essai-2 puis un autre) : changer `GHOSTEO_IMAGE` dans les
+  variables du service et `compose.redeploy` ; vérifier que le volume (base SQLite,
+  `hardware_id`) survit.
 
 ## Phase 3 — Back-office
 
@@ -107,6 +128,14 @@ Contexte utile pour démarrer (état au 10/09/2026) :
   droit d'écrire des clés IAM, donc `create-server.py` passe la clé publique du Beelink en
   tag. Diagnostic sans SSH : Traefik sur 80/443 et Dokploy sur 3000 répondaient, donc le
   cloud-init avait bien tourné ; un redémarrage après pose du tag a suffi.
+- 10/09/2026 : **Dokploy, ce qu'il faut savoir** — l'API est `POST /api/<routeur>.<action>`
+  avec l'en-tête `x-api-key`, spec complète sur `/api/settings.getOpenApiDocument` ; un service
+  compose reçoit un suffixe aléatoire d'appName ; Dokploy dépose le compose et le `.env` dans
+  `/etc/dokploy/compose/<appName>/code/` et injecte lui-même les étiquettes Traefik du domaine
+  (service `web`, port 8080) ; le `docker login` ghcr est fait par Dokploy, l'hôte n'a pas
+  d'identifiant de registre mais garde l'image en cache local (utile pour un `docker run`
+  ponctuel : anonymisation, copie). Scaleway bloque le SMTP sortant (25/465/587) par défaut :
+  sans effet, Mailgun passe en HTTPS.
 - 10/09/2026 : le Beelink n'a ni `scw` ni `jq` ; `scripts/scw.py` (bibliothèque standard
   Python) sert de client d'API. Le DEV1-M coûte 0,0202 € HT/h ; l'IP fixe routée est
   facturée en plus, quelques euros par mois.

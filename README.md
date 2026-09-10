@@ -15,3 +15,5 @@ puis les scripts d'installation des serveurs.
 - [`scripts/create-server.py`](scripts/create-server.py) — crée un serveur chez Scaleway (groupe de
   sécurité, IP fixe, machine, cloud-init) ; `scripts/scw.py` est le mini client d'API qu'il utilise.
   La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink.
+- [`compose/instance.yml`](compose/instance.yml) — gabarit d'une instance GHosteo sur Dokploy
+  (web, scheduler, queue, un volume) ; `scripts/dokploy.py` est le mini client de l'API Dokploy.

@@ -1,0 +1,55 @@
+# Gabarit d'une instance GHosteo sur Dokploy (type « docker-compose », source « raw »).
+#
+# Trois conteneurs depuis la même image, un volume partagé, aucune base à part :
+#   web        nginx + php-fpm, joue les migrations au démarrage, exposé par Traefik
+#   scheduler  php artisan schedule:work (le cron de l'instance)
+#   queue      php artisan queue:work (files d'attente, QUEUE_CONNECTION=database)
+#
+# Les variables viennent du fichier .env que Dokploy dépose à côté de ce fichier
+# (onglet Environment du service, « createEnvFile »). Deux d'entre elles servent ici :
+#   GHOSTEO_IMAGE   ex. ghcr.io/guim31/ghosteo:1.16.0 — changer le tag = déployer une version
+#   APP_URL         l'adresse publique, utilisée aussi par le domaine déclaré dans Dokploy
+# Tout le reste (APP_KEY, DB_*, MAILGUN_*, LICENSE_SERVER_URL…) est lu par Laravel.
+#
+# Le domaine se déclare dans Dokploy (Domains → service « web », port 8080, Let's Encrypt) ;
+# Dokploy ajoute lui-même les étiquettes Traefik et le réseau dokploy-network.
+
+services:
+  web:
+    image: ${GHOSTEO_IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - storage:/var/www/html/storage
+    stop_grace_period: 30s
+
+  scheduler:
+    image: ${GHOSTEO_IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AUTORUN_ENABLED: "false"
+    command: ["php", "/var/www/html/artisan", "schedule:work"]
+    volumes:
+      - storage:/var/www/html/storage
+    healthcheck:
+      disable: true
+    depends_on:
+      - web
+
+  queue:
+    image: ${GHOSTEO_IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AUTORUN_ENABLED: "false"
+    command: ["php", "/var/www/html/artisan", "queue:work", "--tries=3", "--sleep=3", "--max-time=3600"]
+    volumes:
+      - storage:/var/www/html/storage
+    healthcheck:
+      disable: true
+    depends_on:
+      - web
+
+volumes:
+  storage:
