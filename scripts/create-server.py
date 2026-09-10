@@ -2,16 +2,21 @@
 """Crée un serveur GHosteo chez Scaleway, de façon reproductible.
 
   create-server.py control-01 DEV1-M cloud-init/control.yaml [--panel-from IP]
+  create-server.py worker-01 DEV1-L cloud-init/worker.yaml --ssh-from 51.158.96.49 \
+      --ssh-from 82.66.175.113 --authorized-key dokploy.pub
 
 Ce que fait le script, dans l'ordre, et sans rien refaire si ça existe déjà :
   1. groupe de sécurité « ghosteo-<rôle> » : tout refusé en entrée sauf 22, 80, 443 ;
-     avec --panel-from, le port 3000 (panneau Dokploy en clair) n'est ouvert qu'à
-     cette adresse ;
+     avec --ssh-from (répétable), le port 22 n'est ouvert qu'à ces adresses (panneau,
+     maison) au lieu de tout Internet ; avec --panel-from, le port 3000 (panneau
+     Dokploy en clair) n'est ouvert qu'à cette adresse ;
   2. une adresse IP fixe (« flexible ») au nom du serveur, pour que l'IP survive à une
      recréation de la machine ;
   3. la machine, sur Ubuntu 24.04, disque local de 40 Go, avec la clé SSH publique du
      Beelink passée en tag AUTHORIZED_KEY (la section « users » de cloud-init n'est pas
      appliquée à root sur les images Scaleway ; le tag, lui, est lu à chaque démarrage) ;
+     --authorized-key FICHIER (répétable) ajoute d'autres clés publiques de la même
+     façon, par exemple la clé dédiée générée par Dokploy pour piloter un worker ;
   4. le cloud-init injecté comme user_data, PUIS le démarrage.
 
 Le rôle est le mot avant le tiret du nom (control-01 → control). Aucun secret : la clé
@@ -34,11 +39,13 @@ ROOT_SIZE = 40_000_000_000  # 40 Go, plafond du disque local des DEV1
 SSH_PUBKEY = os.path.expanduser("~/.ssh/id_ed25519.pub")
 
 
-def authorized_key_tag():
+def authorized_key_tag(path=SSH_PUBKEY, comment=None):
     """Tag Scaleway AUTHORIZED_KEY : la clé publique, espaces remplacés par des « _ »."""
-    with open(SSH_PUBKEY) as fh:
-        kind, key = fh.read().split()[:2]
-    return f"AUTHORIZED_KEY={kind}_{key}_beelink-claude"
+    with open(path) as fh:
+        parts = fh.read().split()
+    kind, key = parts[:2]
+    comment = comment or (parts[2] if len(parts) > 2 else "beelink-claude")
+    return f"AUTHORIZED_KEY={kind}_{key}_{comment}"
 
 
 def die(msg, payload=None):
@@ -67,7 +74,7 @@ def find_image(commercial_type):
     die(f"aucune image {UBUNTU_LABEL} compatible avec {commercial_type}")
 
 
-def ensure_security_group(project, role, panel_from):
+def ensure_security_group(project, role, panel_from, ssh_from=()):
     name = f"ghosteo-{role}"
     status, payload = call("GET", f"{BASE}/security_groups?project={project}&name={name}")
     ok(status, payload, "liste des groupes de sécurité")
@@ -91,8 +98,8 @@ def ensure_security_group(project, role, panel_from):
         sg = ok(status, payload, "création du groupe de sécurité")["security_group"]
         print(f"groupe de sécurité {name} créé : {sg['id']}")
 
-    wanted = [
-        ("TCP", 22, None),
+    wanted = [("TCP", 22, f"{ip}/32") for ip in ssh_from] or [("TCP", 22, None)]
+    wanted += [
         ("TCP", 80, None),
         ("TCP", 443, None),
         ("UDP", 443, None),
@@ -167,13 +174,17 @@ def main():
     parser.add_argument("commercial_type", help="ex. DEV1-M, DEV1-L")
     parser.add_argument("cloud_init", help="fichier #cloud-config à injecter")
     parser.add_argument("--panel-from", help="IP autorisée sur le port 3000 (panneau Dokploy)")
+    parser.add_argument("--ssh-from", action="append", default=[],
+                        help="IP autorisée sur le port 22 (répétable) ; sans elle, 22 ouvert à tous")
+    parser.add_argument("--authorized-key", action="append", default=[],
+                        help="fichier de clé publique supplémentaire à poser en tag AUTHORIZED_KEY (répétable)")
     args = parser.parse_args()
 
     cfg = load_config()
     project = cfg["default_project_id"]
     role = args.name.split("-")[0]
 
-    sg_id = ensure_security_group(project, role, args.panel_from)
+    sg_id = ensure_security_group(project, role, args.panel_from, args.ssh_from)
     ip = ensure_ip(project, args.name)
 
     server = find_server(project, args.name)
@@ -189,7 +200,8 @@ def main():
                 "project": project,
                 "commercial_type": args.commercial_type,
                 "image": image,
-                "tags": ["ghosteo", role, authorized_key_tag()],
+                "tags": ["ghosteo", role, authorized_key_tag()]
+                + [authorized_key_tag(path) for path in args.authorized_key],
                 "security_group": sg_id,
                 "public_ips": [ip["id"]],
                 "dynamic_ip_required": False,

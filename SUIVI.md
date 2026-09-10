@@ -185,7 +185,13 @@ Contexte utile (état au 10/09/2026) :
   maison (réponses non autoritaires, REFUSED sans récursion) — les vérifications DNS se font
   depuis control-01. Le TXT `_scaleway-challenge` peut maintenant être retiré chez OVH.
 - [ ] Serveurs DNS changés chez OVH, propagation constatée
-- [ ] `worker-01` créé et attaché
+- [ ] `worker-01` créé et attaché — préparé le 10/09/2026 : `cloud-init/worker.yaml` (durcissement
+  seul, ni Docker ni Dokploy : c'est `server.setup` du panneau qui les installe),
+  `create-server.py --ssh-from … --authorized-key …` (port 22 restreint au panneau et à la
+  maison, clé SSH dédiée générée par Dokploy posée en tag). Ordre prévu : `sshKey.generate` +
+  `sshKey.create` (organisation Dokploy `62nTFsf0p7eINVSIDUE2m`) → création Scaleway DEV1-L
+  (31,27 € HT/mois, disponible) → `server.create` (serverType `deploy`, root, 22) →
+  `server.setup` → `server.validate` → déclaration dans le back-office (tinker, plafond 12).
 - [ ] Démo migrée
 
 ## Phase 5 — Clients

@@ -11,7 +11,9 @@ puis les scripts d'installation des serveurs.
   vers Scaleway Object Storage, exécutée depuis le Beelink (`scripts/remote-dump.sh` est le
   morceau qui tourne côté VPS, reçu par SSH). Aucun secret dans ces fichiers.
 - [`cloud-init/control.yaml`](cloud-init/control.yaml) — installation automatique du serveur de contrôle
-  (SSH par clé, pare-feu, mises à jour de sécurité, Dokploy à version fixe).
+  (SSH par clé, pare-feu, mises à jour de sécurité, Dokploy à version fixe) ;
+  [`cloud-init/worker.yaml`](cloud-init/worker.yaml) — la même base pour un serveur de clients, sans
+  Docker ni Dokploy (le panneau les installe en attachant le serveur).
 - [`scripts/create-server.py`](scripts/create-server.py) — crée un serveur chez Scaleway (groupe de
   sécurité, IP fixe, machine, cloud-init) ; `scripts/scw.py` est le mini client d'API qu'il utilise.
   La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink.
