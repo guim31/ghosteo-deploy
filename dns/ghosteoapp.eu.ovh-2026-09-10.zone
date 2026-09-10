@@ -1,0 +1,20 @@
+; Zone ghosteoapp.eu telle qu'hébergée chez OVH, exportée le 10/09/2026 (« Modifier en mode
+; textuel » de l'espace client) avant son déplacement vers Scaleway Domains & DNS (phase 4).
+; Aucun secret. Les NS et le SOA appartiennent à OVH et ne se recopient pas.
+$TTL 3600
+@	IN SOA dns10.ovh.net. tech.ovh.net. (2089040040 86400 3600 3600000 60)
+        IN NS     dns10.ovh.net.
+        IN NS     ns10.ovh.net.
+        IN MX     5 mx2.mail.ovh.net.
+        IN MX     100 mx3.mail.ovh.net.
+        IN MX     1 mx1.mail.ovh.net.
+        IN A     51.178.87.41
+        IN TXT     "v=spf1 include:mx.ovh.com -all"
+        IN TXT     "1|www.ghosteoapp.eu"
+*        IN A     51.178.87.41
+ftp        IN CNAME     ghosteoapp.eu.
+panel        IN A     51.178.87.41
+staging-scw        IN A     51.158.96.49
+test-migration        IN A     51.158.96.49
+www        IN A     51.178.87.41
+www        IN TXT     "3|welcome"

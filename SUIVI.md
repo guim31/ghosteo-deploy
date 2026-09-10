@@ -160,6 +160,17 @@ sur Scaleway (DNS à poser à la main jusqu'à la phase 4), un clic la met à jo
 
 ## Phase 4 — DNS, worker, démo
 
+Contexte utile (état au 10/09/2026) :
+- Export de la zone OVH : `dns/ghosteoapp.eu.ovh-2026-09-10.zone` (16 lignes). À recopier chez
+  Scaleway **sauf** SOA et NS (propres à OVH). Le joker `*` et `@` restent vers `51.178.87.41`
+  tant que les clients ne sont pas migrés. `panel` (ghosteoapp.eu) pointe vers l'ancien VPS :
+  c'est un vestige, sans rapport avec `panel.ghosteo.eu`. Les MX/SPF servent au courrier OVH du
+  domaine : à conserver à l'identique.
+- Le changement de serveurs DNS (`ns0.dom.scw.cloud`, `ns1.dom.scw.cloud`) est le geste de
+  Guilhem, une fois la copie vérifiée. Ensuite : passer `dns_provider` à `scaleway` dans les
+  réglages de ghosteo.eu et y saisir un jeton Scaleway DNS (ou réutiliser la clé du Beelink ?
+  non : une clé dédiée, périmètre DNS seulement).
+
 - [ ] Zone `ghosteoapp.eu` recopiée chez Scaleway et vérifiée
 - [ ] Serveurs DNS changés chez OVH, propagation constatée
 - [ ] `worker-01` créé et attaché
