@@ -345,3 +345,50 @@ Chaque étape laisse la production intacte et se valide seule.
 
 Vito reste actif jusqu'à l'étape 6 : il n'y a pas de bascule brutale, et chaque client
 migre à son heure.
+
+---
+
+## 9. Corrections apportées par la mise en œuvre (11/09/2026)
+
+Ce qui précède a été écrit avant de construire. Quatre points ont été démentis par les
+faits et doivent primer sur ce qui est écrit plus haut.
+
+**9.1 Une instance coûte 140 Mo, pas 250 à 400.** Le § 4 dimensionnait en supposant un
+conteneur MariaDB par client. Le choix SQLite (§ 7.3) l'a supprimé. Mesure sur la démo en
+service : web 64 Mo, scheduler 48 Mo, queue 49 Mo. PHP-FPM tourne en mode `ondemand`
+(20 enfants au plus, 256 Mo chacun), donc une instance au repos ne consomme presque rien.
+Conséquence : `worker-01` est un DEV1-M (3 vCPU, 4 Go, 14,74 € HT/mois) et non un DEV1-L.
+
+**9.2 Les workers stockent bien un identifiant de registre.** Le § 2 affirmait le
+contraire. En réalité Dokploy pose `/root/.docker/config.json` sur chaque serveur au
+premier test de registre, et **sans ce test le premier déploiement échoue** sur
+`unauthorized`. Le jeton est limité à `read:packages`, donc la portée reste faible, mais
+l'affirmation « les workers n'en stockent aucun » est fausse.
+
+**9.3 L'assistant du back-office ne sait pas migrer.** Il tire une `APP_KEY` neuve à
+chaque déploiement, ce qui rendrait illisibles les dossiers d'une instance migrée. Il
+reste l'outil des **nouveaux** clients. Les migrations passent par une procédure
+distincte, éprouvée sur la démo le 11/09/2026 et décrite dans `SUIVI.md`.
+
+**9.4 Le coût réel de l'existant est de 9,79 € HT/mois, pas 15 ou 20.** Facture OVH
+FR72635076 : le VPS actuel (6 vCPU, 12 Go, 100 Go) revient à 71,40 € HT l'an en
+souscription, et son renouvellement au 23/09/2026 est proposé à 9,79 € HT/mois avec
+engagement de 12 mois, 11,29 € sans engagement. L'hébergement Scaleway retenu coûte
+**29,48 € HT/mois** (deux DEV1-M), soit trois fois plus pour moins de ressources.
+
+L'écart s'explique : un VPS OVH est un contrat annuel, une instance Scaleway se facture à
+l'heure sans engagement. Le catalogue Scaleway a été revu en entier le 11/09/2026 ; la
+gamme DEV1 est la moins chère de leur offre et c'est celle utilisée. Les options moins
+chères ont été examinées et écartées : DEV1-S pour le worker (6,55 €) ne laisse que
+1,4 Go libres, une seule machine pour tout (14,74 €) remet les clients et le serveur de
+licences ensemble, deux VPS OVH (19,58 €) défont le bénéfice principal du chantier en
+rendant la création d'un serveur manuelle.
+
+**Décision de Guilhem, 11/09/2026 : on reste sur deux DEV1-M chez Scaleway (29,48 € HT
+par mois), en connaissance de l'écart de prix.** Ce qu'il achète : des machines
+reconstruites par script en dix minutes, des mises à jour sans compilation sur le serveur,
+un plan de contrôle séparé des clients, et aucun engagement de durée.
+
+**Conséquence à ne pas manquer** : le VPS OVH doit être **renouvelé sans engagement** le
+23/09/2026. Il ne sert plus que trois mois environ (migrations, puis 30 jours de
+conservation) ; un engagement de 12 mois immobiliserait 117,48 € pour rien.
