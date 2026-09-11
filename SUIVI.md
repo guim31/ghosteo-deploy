@@ -193,7 +193,12 @@ Contexte utile (état au 10/09/2026) :
   dans « Opérations en cours », avec une option « skip » **à ne pas utiliser** : un résolveur qui a
   encore l'ancien DS en cache refuserait les réponses non signées de Scaleway). À prévoir aussi pour
   `ghosteo.eu` en phase 6 : désactiver DNSSEC la veille, ou compter 24 h de plus.
-- [ ] Propagation constatée
+- [x] **Propagation constatée le 11/09/2026** : OVH a exécuté l'opération à 15h17 ; à 15h19 le
+  registre `.eu` délègue à `ns0`/`ns1.dom.scw.cloud`, Google, Quad9 puis Cloudflare répondent par
+  Scaleway (alternance de caches pendant l'heure suivante, normale). Par le nouveau chemin : apex,
+  démo, staging, instances clientes → `51.178.87.41`, `staging-scw` → `51.158.96.49`, MX intacts,
+  démo en HTTPS 302. Aucun client touché. Reste à faire côté OVH par Guilhem, sans urgence :
+  retirer le TXT `_scaleway-challenge` (dans la zone OVH, désormais inactive).
 - [ ] `worker-01` créé et attaché — préparé le 10/09/2026 : `cloud-init/worker.yaml` (durcissement
   seul, ni Docker ni Dokploy : c'est `server.setup` du panneau qui les installe),
   `create-server.py --ssh-from … --authorized-key …` (port 22 restreint au panneau et à la
