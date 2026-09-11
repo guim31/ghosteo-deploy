@@ -187,6 +187,12 @@ Contexte utile (état au 10/09/2026) :
 - [~] Serveurs DNS changés chez OVH par Guilhem le 10/09/2026 vers 15h20 (`ns0`/`ns1.dom.scw.cloud`,
   sans IP associée ; OVH affiche « en cours d'activation »). Propagation surveillée depuis control-01
   (registre `.eu` via `x.dns.eu`, Cloudflare, Google).
+  **11/09/2026 11h15 : toujours OVH au registre `.eu`.** Cause : le domaine avait **DNSSEC activé
+  chez OVH**. OVH a retiré la signature (DS) au registre à 15h17 le 10/09, puis retarde le changement
+  de serveurs de 24 h pour laisser expirer les caches (exécution planifiée le 11/09 à 15h17, visible
+  dans « Opérations en cours », avec une option « skip » **à ne pas utiliser** : un résolveur qui a
+  encore l'ancien DS en cache refuserait les réponses non signées de Scaleway). À prévoir aussi pour
+  `ghosteo.eu` en phase 6 : désactiver DNSSEC la veille, ou compter 24 h de plus.
 - [ ] Propagation constatée
 - [ ] `worker-01` créé et attaché — préparé le 10/09/2026 : `cloud-init/worker.yaml` (durcissement
   seul, ni Docker ni Dokploy : c'est `server.setup` du panneau qui les installe),
