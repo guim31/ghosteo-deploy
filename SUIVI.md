@@ -216,7 +216,60 @@ Contexte utile (état au 10/09/2026) :
   **Piège de méthode** : `pgrep -f "Installing requirements"` lancé par SSH s'attrape lui-même
   (la chaîne est dans sa propre ligne de commande) — la surveillance annonçait « en cours » alors
   que l'installation était finie. Vérifier par `server.validate`, pas par `pgrep`.
-- [ ] Démo migrée
+- [x] **Démo migrée** le 11/09/2026, de 15h48 à 16h26 (coupure HTTPS réelle : ~12 min, de la bascule
+  DNS à 16h13 au certificat à 16h25). `demo.ghosteoapp.eu` tourne sur worker-01 : service compose
+  `MCvTGAWk5Fa6E4Nz2RQ5Y` (appName `ghosteo-demo-fotozg`), volume `ghosteo-demo-fotozg_storage`,
+  certificat Let's Encrypt jusqu'au 10/12/2026, HTTP redirigé, ressources en HTTPS.
+  Contrôles après bascule : 71 patients, 747 consultations, 2 comptes — identiques à l'ancienne —,
+  déchiffrement OK (clé d'origine conservée), `hardware_id` conservé, aucune migration en attente,
+  `/up` 200, `/login` 200. Instance #2 du back-office rattachée au serveur #2.
+  **L'ancienne instance n'a pas été mise en maintenance** (action refusée par le contrôle
+  d'autorisations de l'agent) : pour la démo c'est sans conséquence, mais **pour un vrai client il
+  faut cette étape** — prévoir une règle d'autorisation ou que Guilhem lance `php artisan down`
+  lui-même au début du créneau. L'ancienne démo tourne toujours, intacte, sur le VPS OVH.
+  Sauvegardes conservées dans `/root/demo-migration/` de control-01 (dump à froid, SQLite, `.env`
+  d'origine, mode 600) — à supprimer après 30 jours.
+
+### Ce que la répétition générale a appris (à appliquer en phase 5)
+
+1. **L'assistant du back-office n'est pas l'outil de migration.** Il tire une nouvelle `APP_KEY` à
+   chaque déploiement (`EnvFileGenerator`, aucun champ pour en fournir une), ce qui rendrait
+   illisibles les dossiers patients d'une instance migrée. Une migration se fait donc par appels
+   directs à Dokploy, en repartant du `.env` de l'ancienne instance. *Amélioration possible du
+   back-office : un mode « migration » avec un champ APP_KEY.*
+2. **Ordre retenu, qui réduit la coupure à quelques minutes** : créer l'instance sur le worker et
+   la déployer **avant** de toucher au DNS (le certificat échouera, c'est normal), puis maintenance,
+   sauvegarde à froid, conversion, copie dans le volume, **et seulement alors** la bascule DNS.
+   Tout ce qui est long (téléchargement de l'image, démarrage, migrations) est ainsi fait à froid.
+3. **Abaisser le TTL avant la bascule.** `dns-scaleway.py set <nom> <ancienne IP> 60` la veille :
+   sans ça, l'ancienne réponse reste en cache jusqu'à 1 h. Avec un TTL de 60 s, Google et
+   Cloudflare ont suivi en moins d'une minute.
+4. **Traefik ne retente pas indéfiniment un certificat en échec.** Les tentatives d'avant la
+   bascule échouent (le défi ACME part vers l'ancien serveur), puis il s'arrête. Après la bascule
+   DNS, **redémarrer `dokploy-traefik` sur le worker** : le certificat est délivré en ~30 s.
+   Sans ce geste, le site reste sur le certificat par défaut de Traefik, avec alerte du navigateur.
+5. **Un worker neuf ne sait pas tirer les images privées.** Le premier déploiement échoue sur
+   `unauthorized`. Il faut lancer une fois le test du registre **en visant ce serveur**
+   (`registry.testRegistryById` avec le `serverId`, ou le bouton de test dans Dokploy) : il pose
+   `/root/.docker/config.json` sur la machine. À faire pour chaque nouveau worker.
+   *Correction à DECISIONS § 2* : les workers **stockent bien** un identifiant de registre (le
+   jeton `read:packages`), contrairement à ce qui y était supposé.
+6. **Vérifier depuis control-01, jamais depuis le Beelink.** Le résolveur de la maison garde
+   l'ancienne adresse en cache : une vérification faite d'ici a « validé » l'ancien serveur, avec
+   son ancien certificat. Même piège que pour la comparaison des zones.
+7. **`hardware_id` vit dans `storage/app/`.** Extraire l'archive de `storage` **sans**
+   `--strip-components` (le volume est monté sur `storage`, pas sur `storage/app`), sinon la
+   licence repart sur une nouvelle empreinte matérielle.
+8. **MySQL temporaire de conversion** : `mysql:8.4` refuse `--default-authentication-plugin`
+   (option supprimée) et n'accepte `root` **que par TCP** (`--protocol=TCP -h127.0.0.1`), pas par
+   socket. Attendre par `mysqladmin ping` en boucle, pas sur le message « ready for connections »
+   du journal, qui est celui du serveur temporaire d'initialisation.
+
+**Reste à faire pour clore la phase 4** (action de Guilhem) : créer chez Scaleway une **clé d'API
+dédiée au DNS** (IAM → Clés API, périmètre `DomainsDNSFullAccess` sur le projet `ghosteo`) et me la
+donner, pour passer `dns_provider` de « manuel » à « scaleway » dans les réglages du back-office.
+La clé du Beelink n'est pas réutilisée à dessein : son périmètre est trop large pour être posée
+dans une application.
 
 ## Phase 5 — Clients
 

@@ -5,6 +5,11 @@
   dns-scaleway.py compare dns/<fichier>.zone      interroge OVH et Scaleway et compare
   dns-scaleway.py status                          état de validation du domaine externe
   dns-scaleway.py records                         liste les enregistrements de la zone Scaleway
+  dns-scaleway.py set <nom> <ip> [ttl]            pose ou remplace un A (ex. « set demo 51.15.247.226 60 »)
+
+« set » sert aux bascules d'instances (phase 5) : on pose d'abord le nom sur l'ANCIENNE adresse
+avec un TTL court, on attend l'expiration de l'ancien cache (jusqu'à l'ancien TTL, 3600 s ici),
+puis on repose le même nom sur la NOUVELLE adresse — la bascule est alors quasi instantanée.
 
 Le fichier de zone est l'export « mode textuel » d'OVH. Les lignes SOA et NS sont ignorées
 (propres à l'hébergeur). Une ligne dont le nom est vide hérite du nom précédent (« @ »).
@@ -143,6 +148,21 @@ def status():
         print("zone : (aucune pour l'instant)")
 
 
+def set_a(name, ip, ttl=300):
+    """Pose ou remplace l'enregistrement A d'un sous-domaine de la zone."""
+    status, payload = call(
+        "PATCH", f"/domain/v2beta1/dns-zones/{ZONE}/records",
+        {"changes": [{"set": {
+            "id_fields": {"name": name, "type": "A"},
+            "records": [{"name": name, "type": "A", "data": ip, "ttl": int(ttl)}],
+        }}], "return_all_records": False},
+    )
+    if not 200 <= status < 300:
+        print("ERREUR HTTP", status, payload, file=sys.stderr)
+        sys.exit(1)
+    print(f"{name}.{ZONE} → {ip} (TTL {ttl} s)")
+
+
 def records():
     st, payload = call("GET", f"/domain/v2beta1/dns-zones/{ZONE}/records?page_size=100")
     if st != 200:
@@ -161,5 +181,7 @@ if __name__ == "__main__":
         status()
     elif cmd == "records":
         records()
+    elif cmd == "set" and len(sys.argv) in (4, 5):
+        set_a(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) == 5 else 300)
     else:
         print(__doc__); sys.exit(2)
