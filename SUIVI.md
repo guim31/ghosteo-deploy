@@ -270,6 +270,36 @@ Contexte utile (état au 10/09/2026) :
    socket. Attendre par `mysqladmin ping` en boucle, pas sur le message « ready for connections »
    du journal, qui est celui du serveur temporaire d'initialisation.
 
+### Dimensionnement revu le 11/09/2026
+
+Mesure sur la démo en service : **une instance complète occupe ~140 Mo** (web 64, scheduler 48,
+queue 49), pas les 250 à 400 Mo estimés dans DECISIONS § 4 — cette estimation supposait un
+conteneur MariaDB par client, supprimé par le choix SQLite. PHP-FPM est en mode `ondemand`
+(20 enfants au plus, 256 Mo chacun) : une instance au repos ne coûte presque rien.
+
+**worker-01 ramené de DEV1-L à DEV1-M** (3 vCPU, 4 Go) le 11/09/2026 à la demande de Guilhem :
+31,27 → 14,74 € HT/mois. Coupure de 2 min 20 (extinction, changement d'offre par l'API, rallumage ;
+les conteneurs repartent seuls). Le disque local de 40 Go posé par `create-server.py` rend ce
+changement possible sans recréer la machine — un DEV1-L par défaut aurait pris 80 Go et bloqué le
+retour en arrière. Après réduction : 699 Mo utilisés sur 3 909, dont 119 Mo pour Traefik.
+Plafond laissé à 12 ; à revoir vers 8-10 si les instances réelles s'avèrent plus lourdes que la démo.
+
+**Coût réel de l'ancien hébergement, relevé sur la facture OVH FR72635076 du 23/09/2025** :
+VPS-2 (`vps-fdce4053`, 6 vCPU, 12 Go, 100 Go) **71,40 € HT pour 12 mois**, plus l'option Snapshot
+8,40 € HT/an, l'option Automated Backup offerte : **79,80 € HT/an, soit 6,65 € HT/mois**.
+Le nouvel hébergement Scaleway coûte **29,48 € HT/mois** (control-01 14,74 + worker-01 14,74),
+soit **4,4 fois plus, pour moins de processeur, de mémoire et de disque**. À mettre en regard de
+ce qu'il apporte : machines reproductibles, déploiement sans compilation, plan de contrôle séparé.
+**Inconnue à lever avant le 23/09/2026** : le prix de renouvellement du VPS OVH, la facture de 2025
+étant une souscription (tarif de première année probable). Guilhem doit le vérifier dans son espace
+client ; si le renouvellement reste autour de 7 €/mois, l'écart justifie de rouvrir le choix du
+fournisseur pour le calcul (le DNS, lui, reste chez Scaleway et ne coûte rien).
+
+- [x] Démo passée sur **`essai-3`** le 11/09/2026 : l'image `essai-2` ne contenait pas le correctif
+  des index SQLite (PR #195, fusionnée après sa construction). Migration
+  `add_missing_foreign_key_indexes_for_sqlite` désormais appliquée, 66 index contre 32.
+  **Aucun client ne doit être migré sur une image antérieure à `essai-3`.**
+
 **Reste à faire pour clore la phase 4** (action de Guilhem) : créer chez Scaleway une **clé d'API
 dédiée au DNS** (IAM → Clés API, périmètre `DomainsDNSFullAccess` sur le projet `ghosteo`) et me la
 donner, pour passer `dns_provider` de « manuel » à « scaleway » dans les réglages du back-office.
