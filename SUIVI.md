@@ -360,6 +360,26 @@ rendu réel, viser le conteneur : `docker exec <app>-web-1 curl http://127.0.0.1
 instances depuis Scaleway et les chiffres redeviendront comparables entre eux. Les seuils
 d'alerte du moniteur seront à relire à ce moment-là.
 
+### Défaut de la chaîne de livraison : le tag ne construit jamais l'image (12/09/2026)
+
+`v1.17.0` a été livrée par Guilhem le 11/09/2026 à 23h51 (PR #201 fusionnée, tag posé, commit
+`release: v1.17.0 (#201)` sur `main`). **Aucune image n'a été publiée**, toujours rien 40 min après.
+
+Cause : `release.yml` pose le tag depuis le workflow, avec le `GITHUB_TOKEN` par défaut
+(auteur `github-actions[bot]`). Or la documentation GitHub est explicite : « With the exception of
+`workflow_dispatch` and `repository_dispatch`, other `GITHUB_TOKEN`-triggered events do not create
+workflow runs at all. » Le déclencheur `push: tags: ["v*"]` de `docker.yml` ne se déclenche donc
+jamais à la livraison. C'est aussi pourquoi `v1.16.0` n'a jamais eu d'image, et pourquoi seules
+les images lancées à la main existent (`essai-1`, `essai-2`, `essai-3`).
+
+- **Contournement immédiat** : onglet Actions → « Image Docker » → *Run workflow* → branche `main`,
+  champ tag `1.17.0`. Produit la même image.
+- **Correctif durable proposé** : faire de `docker.yml` un workflow réutilisable (`workflow_call`)
+  et l'appeler depuis `release.yml` après la pose du tag. Une seule construction, pas de jeton
+  personnel à stocker. Alternative écartée : pousser le tag avec un PAT, qui remettrait un secret
+  de longue durée dans le dépôt. **Demande la permission « Workflows » sur le jeton GitHub**, à
+  redonner temporairement puis à retirer (comme en phase 1).
+
 ## Phase 5 — Clients
 
 **Deux cabinets ne sont pas en métropole** (indiqué par Guilhem le 11/09/2026). Une soirée
