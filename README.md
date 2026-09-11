@@ -17,6 +17,11 @@ puis les scripts d'installation des serveurs.
 - [`scripts/create-server.py`](scripts/create-server.py) — crée un serveur chez Scaleway (groupe de
   sécurité, IP fixe, machine, cloud-init) ; `scripts/scw.py` est le mini client d'API qu'il utilise.
   La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink.
+- [`scripts/migrate-instance.py`](scripts/migrate-instance.py) — migration d'une instance cliente du
+  VPS OVH vers un worker Dokploy, en quatre commandes (`ttl`, `preparer`, `basculer`, `verifier`).
+  La clé de chiffrement de l'instance est conservée, sans quoi les dossiers patients seraient
+  illisibles : c'est pourquoi l'assistant du back-office, qui en tire une neuve, ne convient pas.
+  L'inventaire des cabinets se met dans `clients.yaml` (non versionné, voir `clients.yaml.exemple`).
 - [`compose/instance.yml`](compose/instance.yml) — gabarit d'une instance GHosteo sur Dokploy
   (web, scheduler, queue, un volume) ; `scripts/dokploy.py` est le mini client de l'API Dokploy.
 - [`scripts/dns-scaleway.py`](scripts/dns-scaleway.py) — recopie l'export de zone OVH (`dns/`) chez Scaleway

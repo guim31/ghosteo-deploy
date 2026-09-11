@@ -300,6 +300,16 @@ fournisseur pour le calcul (le DNS, lui, reste chez Scaleway et ne coûte rien).
   `add_missing_foreign_key_indexes_for_sqlite` désormais appliquée, 66 index contre 32.
   **Aucun client ne doit être migré sur une image antérieure à `essai-3`.**
 
+**Outil de migration écrit le 11/09/2026** : `scripts/migrate-instance.py`, quatre commandes
+(`ttl` la veille, `preparer` sans coupure, `basculer` dans le créneau, `verifier`). Il reprend
+exactement la procédure jouée sur la démo, y compris les pièges : clé de chiffrement conservée,
+extraction du storage sans `--strip-components`, redémarrage de Traefik après la bascule,
+vérifications lancées depuis control-01. Testé sur la démo (commande `verifier`).
+L'inventaire des cabinets est dans `clients.yaml`, non versionné.
+
+**Décision de Guilhem le 11/09/2026 : on reste sur deux DEV1-M (29,48 € HT/mois).** Voir
+DECISIONS § 9 pour le détail du comparatif et l'écart assumé avec OVH.
+
 **Reste à faire pour clore la phase 4** (action de Guilhem) : créer chez Scaleway une **clé d'API
 dédiée au DNS** (IAM → Clés API, périmètre `DomainsDNSFullAccess` sur le projet `ghosteo`) et me la
 donner, pour passer `dns_provider` de « manuel » à « scaleway » dans les réglages du back-office.

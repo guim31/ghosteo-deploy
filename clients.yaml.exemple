@@ -1,0 +1,25 @@
+# Inventaire des instances à migrer, lu par scripts/migrate-instance.py.
+#
+# Copier ce fichier en « clients.yaml » et le remplir. clients.yaml est ignoré par git :
+# il ne contient pourtant aucun secret, mais la liste nominative des cabinets clients n'a
+# rien à faire dans un dépôt public.
+#
+#   domaine     l'adresse publique actuelle de l'instance
+#   repertoire  son répertoire sur le VPS OVH (voir l'inventaire dans SUIVI.md)
+#   worker_ssh  l'alias SSH du serveur d'accueil, dans ~/.ssh/config du Beelink
+#   server_id   l'identifiant Dokploy de ce serveur (server.all)
+#   image       l'image à déployer — JAMAIS antérieure à essai-3 (index SQLite, PR #195)
+
+guilhem-henry:
+  domaine: guilhem-henry.ghosteoapp.eu
+  repertoire: /home/guilhemhenry/guilhem-henry.ghosteoapp.eu
+  worker_ssh: worker-01
+  server_id: zHNG7citX1VozvviOoNga
+  image: ghcr.io/guim31/ghosteo:essai-3
+
+# xavier-pages:
+#   domaine: xavier-pages.ghosteoapp.eu
+#   repertoire: /home/xavierpages/xavier-pages.ghosteoapp.eu
+#   worker_ssh: worker-01
+#   server_id: zHNG7citX1VozvviOoNga
+#   image: ghcr.io/guim31/ghosteo:essai-3
