@@ -260,7 +260,12 @@ Contexte utile (état au 10/09/2026) :
 7. **`hardware_id` vit dans `storage/app/`.** Extraire l'archive de `storage` **sans**
    `--strip-components` (le volume est monté sur `storage`, pas sur `storage/app`), sinon la
    licence repart sur une nouvelle empreinte matérielle.
-8. **MySQL temporaire de conversion** : `mysql:8.4` refuse `--default-authentication-plugin`
+8. **Poser un enregistrement change aussi le TTL du joker.** Chez Scaleway, un `set` désignant un
+   enregistrement par son nom et son type (ce que fait `ScalewayDnsProvider` du back-office)
+   réécrit au passage le TTL de `*`. Reproduit trois fois. Sans gravité — l'adresse du joker n'est
+   pas touchée, seule sa durée de cache l'est — mais à savoir avant de s'en inquiéter. Pour viser
+   un enregistrement sans ambiguïté, le désigner par son `id` (`{"set": {"id": "...", ...}}`).
+9. **MySQL temporaire de conversion** : `mysql:8.4` refuse `--default-authentication-plugin`
    (option supprimée) et n'accepte `root` **que par TCP** (`--protocol=TCP -h127.0.0.1`), pas par
    socket. Attendre par `mysqladmin ping` en boucle, pas sur le message « ready for connections »
    du journal, qui est celui du serveur temporaire d'initialisation.
