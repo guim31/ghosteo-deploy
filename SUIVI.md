@@ -332,6 +332,34 @@ le 11/09/2026, qui a fait refaire une clé pour rien à Guilhem) :
 
 **Reste à faire pour clore la phase 4** : rien côté agent.
 
+### Le moniteur montre la démo « plus lente » depuis la migration — explication (11/09/2026)
+
+La courbe du moniteur monte après la bascule. **Ce n'est pas une dégradation** : c'est un
+artefact de l'endroit d'où la sonde mesure.
+
+La sonde tourne **sur le VPS OVH**. Avant la migration, la démo était sur cette même machine :
+elle se mesurait elle-même, sans réseau. Depuis, la mesure traverse Internet jusqu'à Paris.
+
+| Mesure | Démo (Scaleway) | Staging (resté sur le VPS) |
+|---|---|---|
+| Rendu de `/login` dans le conteneur, sans réseau | **20 à 27 ms** | 46 à 61 ms |
+| Vu depuis le VPS, parcours complet d'un visiteur | 115 à 221 ms | 62 à 78 ms |
+| Vu depuis la maison, parcours complet | **172 à 232 ms** | 170 à 204 ms |
+| Latence réseau depuis la maison | 14,5 ms | 19,6 ms |
+
+Autrement dit : l'application rend la page **deux fois plus vite** qu'avant (SQLite indexé,
+image récente), et pour un vrai visiteur les deux hébergements sont équivalents, Scaleway étant
+même un peu plus proche en réseau. Seule la sonde, qui a perdu son avantage de localité, voit
+une hausse.
+
+**Piège de méthode rencontré** : mesurer `http://127.0.0.1/` sur le worker avec un en-tête `Host`
+ne mesure **que la redirection de Traefik** (1,5 ms), pas l'application. Pour chronométrer le
+rendu réel, viser le conteneur : `docker exec <app>-web-1 curl http://127.0.0.1:8080/login`.
+
+**Conséquence pour la phase 6** : quand ghosteo.eu quittera le VPS, la sonde mesurera toutes les
+instances depuis Scaleway et les chiffres redeviendront comparables entre eux. Les seuils
+d'alerte du moniteur seront à relire à ce moment-là.
+
 ## Phase 5 — Clients
 
 **Deux cabinets ne sont pas en métropole** (indiqué par Guilhem le 11/09/2026). Une soirée
