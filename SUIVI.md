@@ -199,13 +199,23 @@ Contexte utile (état au 10/09/2026) :
   démo, staging, instances clientes → `51.178.87.41`, `staging-scw` → `51.158.96.49`, MX intacts,
   démo en HTTPS 302. Aucun client touché. Reste à faire côté OVH par Guilhem, sans urgence :
   retirer le TXT `_scaleway-challenge` (dans la zone OVH, désormais inactive).
-- [ ] `worker-01` créé et attaché — préparé le 10/09/2026 : `cloud-init/worker.yaml` (durcissement
-  seul, ni Docker ni Dokploy : c'est `server.setup` du panneau qui les installe),
-  `create-server.py --ssh-from … --authorized-key …` (port 22 restreint au panneau et à la
-  maison, clé SSH dédiée générée par Dokploy posée en tag). Ordre prévu : `sshKey.generate` +
-  `sshKey.create` (organisation Dokploy `62nTFsf0p7eINVSIDUE2m`) → création Scaleway DEV1-L
-  (31,27 € HT/mois, disponible) → `server.create` (serverType `deploy`, root, 22) →
-  `server.setup` → `server.validate` → déclaration dans le back-office (tinker, plafond 12).
+- [x] **`worker-01` créé et attaché** le 11/09/2026 : Scaleway DEV1-L fr-par-1 (4 vCPU, 8 Go,
+  31,27 € HT/mois), **IP fixe `51.15.247.226`**, serveur `62f5777e-6d5a-43c4-9e35-085d307c8de5`,
+  groupe de sécurité `ghosteo-worker` (**22 ouvert seulement depuis control-01 et la maison**,
+  80/443 publics). Cloud-init `worker.yaml` appliqué en 250 s (swap 2 Go, ufw, fail2ban, MAJ de
+  sécurité), sans Docker : c'est le panneau qui l'installe.
+  Attaché à Dokploy : clé SSH dédiée `ghosteo-workers` (`-jg8rdKLAHDliUS2mJsQe`, générée par le
+  panneau, posée en tag AUTHORIZED_KEY par `create-server.py --authorized-key`), serveur
+  `zHNG7citX1VozvviOoNga`, `server.setup` ~10 min (Docker 28.5.0, swarm, dokploy-network,
+  Traefik 3.6.25, rclone/nixpacks/pack/railpack), `server.validate` : tout à `enabled`.
+  **Adresse Let's Encrypt corrigée** dans `/etc/dokploy/traefik/traefik.yml`
+  (`test@localhost.com` → guilhemhenry@gmail.com, sauvegarde `.bak-20260911`, Traefik redémarré)
+  — même piège que control-01, `server.setup` ne le fait pas.
+  Déclaré dans le back-office : serveur **#2**, plafond 12, `provider=scaleway`, `external_id` =
+  l'identifiant Dokploy. Alias SSH `worker-01` dans `~/.ssh/config` du Beelink.
+  **Piège de méthode** : `pgrep -f "Installing requirements"` lancé par SSH s'attrape lui-même
+  (la chaîne est dans sa propre ligne de commande) — la surveillance annonçait « en cours » alors
+  que l'installation était finie. Vérifier par `server.validate`, pas par `pgrep`.
 - [ ] Démo migrée
 
 ## Phase 5 — Clients
