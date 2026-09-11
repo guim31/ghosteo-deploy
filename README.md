@@ -20,4 +20,6 @@ puis les scripts d'installation des serveurs.
 - [`compose/instance.yml`](compose/instance.yml) — gabarit d'une instance GHosteo sur Dokploy
   (web, scheduler, queue, un volume) ; `scripts/dokploy.py` est le mini client de l'API Dokploy.
 - [`scripts/dns-scaleway.py`](scripts/dns-scaleway.py) — recopie l'export de zone OVH (`dns/`) chez Scaleway
-  Domains & DNS et compare les réponses des deux annuaires avant le changement de serveurs de noms.
+  Domains & DNS, compare les réponses des deux annuaires, et pose les enregistrements A des
+  bascules d'instances (`set <nom> <ip> [ttl]`). Les vérifications se lancent depuis `control-01` :
+  le résolveur de la maison intercepte les requêtes DNS sortantes.
