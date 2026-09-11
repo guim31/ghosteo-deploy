@@ -310,11 +310,27 @@ L'inventaire des cabinets est dans `clients.yaml`, non versionné.
 **Décision de Guilhem le 11/09/2026 : on reste sur deux DEV1-M (29,48 € HT/mois).** Voir
 DECISIONS § 9 pour le détail du comparatif et l'écart assumé avec OVH.
 
-**Reste à faire pour clore la phase 4** (action de Guilhem) : créer chez Scaleway une **clé d'API
-dédiée au DNS** (IAM → Clés API, périmètre `DomainsDNSFullAccess` sur le projet `ghosteo`) et me la
-donner, pour passer `dns_provider` de « manuel » à « scaleway » dans les réglages du back-office.
-La clé du Beelink n'est pas réutilisée à dessein : son périmètre est trop large pour être posée
-dans une application.
+- [x] **Le back-office écrit lui-même les enregistrements DNS**, le 11/09/2026. Application IAM
+  `backoffice-dns` créée par Guilhem, politique unique `DomainsDNSFullAccess` limitée au projet
+  `ghosteo`, clé portée par l'application (et non par l'utilisateur). Jeton rangé chiffré dans les
+  réglages du back-office (`scaleway_dns_token`), `dns_provider` passé à `scaleway`. Essai réel :
+  `ScalewayDnsProvider` a posé `test-dns-auto.ghosteoapp.eu → 51.15.247.226` (TTL 300 s), vérifié
+  sur le serveur de noms, puis supprimé. **Expiration de la clé : 11/09/2027** — la création de
+  nouveaux clients cessera silencieusement ce jour-là si elle n'est pas renouvelée.
+
+**Comment contrôler le périmètre d'une clé Scaleway, et comment NE PAS le faire** (erreur commise
+le 11/09/2026, qui a fait refaire une clé pour rien à Guilhem) :
+
+- `GET` sur une **liste** (`/instance/v1/.../servers`) renvoie **200 avec une liste vide** quand la
+  clé n'a pas le droit. Un 200 ne prouve donc aucun droit.
+- `POST` avec un corps invalide renvoie **400** même sans permission : Scaleway valide la forme de
+  la requête **avant** les droits. Un 400 ne prouve donc aucun droit non plus.
+- La seule sonde fiable est un `GET` sur une **ressource précise et existante**
+  (`/servers/<id>`) : la réponse est alors `403 permissions_denied` avec le détail de la
+  ressource et de l'action refusées.
+- Pour l'écriture, poser un enregistrement réel puis le supprimer.
+
+**Reste à faire pour clore la phase 4** : rien côté agent.
 
 ## Phase 5 — Clients
 
