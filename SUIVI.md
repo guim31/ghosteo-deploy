@@ -318,6 +318,20 @@ dans une application.
 
 ## Phase 5 — Clients
 
+**Deux cabinets ne sont pas en métropole** (indiqué par Guilhem le 11/09/2026). Une soirée
+française y est le milieu de la journée de travail : migrer à l'heure locale du praticien,
+pas à la nôtre. Guilhem n'autorise la mise en maintenance que pendant **leur** nuit.
+
+| Instance | Lieu | Décalage / Paris | Leur nuit 22h-05h, en heure de Paris |
+|---|---|---|---|
+| `anais-delaunay` | Nouvelle-Calédonie | +9 h (été) / +10 h (hiver) | 13h00 → 20h00 (été) ; 12h00 → 19h00 (hiver) |
+| `aurelien-marie-joseph` | Martinique | −6 h (été) / −5 h (hiver) | 04h00 → 11h00 (été) ; 03h00 → 10h00 (hiver) |
+
+Le changement d'heure français du 25/10/2026 décale ces créneaux d'une heure : recalculer
+après cette date. Les cinq autres cabinets sont en métropole, créneau de soirée habituel.
+
+
+
 | Client | Créneau | Migré le | Vérifié par le client | Ancienne instance éteinte le |
 |---|---|---|---|---|
 | (cabinet de Guilhem) | | | | |
