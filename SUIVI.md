@@ -455,8 +455,48 @@ Bascule à 09h06 heure de Paris, soit **03h06 chez lui**, dans le créneau autor
 `GHOSTEO-VIP-WHVZOLXVPPRG` intacte, volume de 18 Mo. Le script a tourné **sans aucune
 intervention** : première migration entièrement automatique.
 
-Worker-01 après deux cabinets et la démo : **3 instances sur 12**, 1 121 Mo de RAM sur 3 909.
-Projection à 12 instances : environ 2,6 Go, ce qui tient dans les 4 Go du DEV1-M.
+Worker-01 après deux cabinets et la démo : **3 instances sur 12**.
+
+### Mesure sérieuse du coût mémoire d'une instance (12/09/2026)
+
+Question de Guilhem : passer de 2 à 3 instances n'a ajouté que 160 Mo au « used » de `free`,
+ce qui ne collait pas. En effet : **`free` et `docker stats` ne servent à rien ici**, ils
+mélangent mémoire réellement occupée et cache de fichiers, lequel est récupérable et surtout
+**partagé entre instances** (même image, mêmes couches). La bonne mesure est
+`memory.stat` du cgroup, en additionnant `anon`, `shmem`, `kernel` et `slab`.
+
+| Conteneur | anon | partagée | noyau | non récupérable |
+|---|---|---|---|---|
+| `web` | 11 Mo | 24-31 Mo | 9-11 Mo | **45 à 53 Mo** |
+| `scheduler` | 17 Mo | 27 Mo | 4 Mo | **48 Mo** |
+| `queue` | 18 Mo | 27 Mo | 4 Mo | **50 Mo** |
+| **une instance complète** | | | | **≈ 148 Mo** |
+
+Modèle validé par le total système : les 10 conteneurs pèsent 462 Mo, et
+`AnonPages + Shmem + SUnreclaim` du système vaut 697 Mo — soit **235 Mo pour l'hôte**
+(système, dockerd, containerd, fail2ban, noyau) et 18 Mo pour Traefik.
+
+**Projection corrigée pour un DEV1-M (3 909 Mo)** : 235 (hôte) + 18 (Traefik) + 12 × 148
+= **2 029 Mo**, soit 52 % de la machine. Il reste environ 1,9 Go pour le cache et les pointes.
+Le plafond de 12 est donc tenable. *(La projection annoncée plus haut, « environ 2,6 Go », était
+juste par accident : elle partait d'un chiffre `docker stats` qui approximait le bon total pour
+de mauvaises raisons.)*
+
+**Coût de la charge, mesuré** : 12 requêtes simultanées sur une instance font passer son
+conteneur `web` de 13 à 38-51 Mo d'`anon` et ouvrent 12 processus PHP, qui disparaissent en
+moins de 25 s (PHP-FPM en mode `ondemand`). Soit **+25 à 38 Mo pour une instance saturée**, et
+2 à 3 Mo par requête concurrente seulement : l'essentiel du processus PHP est partagé avec son
+parent. Un cabinet de deux ou trois praticiens ne dépassera pas quelques mégaoctets.
+
+**Deux leviers si la place venait à manquer**, dans cet ordre :
+
+1. **Les conteneurs `scheduler` et `queue` coûtent 98 Mo des 148**, soit deux tiers, pour deux
+   processus qui dorment (0,1 % de CPU). Leur `shmem` de 27 Mo chacun est le cache de code PHP :
+   `opcache.memory_consumption` vaut 128 Mo alors que **8 Mo seulement sont utilisés**, et
+   `opcache.enable_cli` est actif. Le réduire dans l'image économiserait ~50 Mo par instance,
+   soit 600 Mo à douze cabinets. À faire par une PR sur `ghosteo`, pas en urgence.
+2. Repasser worker-01 en DEV1-L (8 Go, 31,27 €), ou créer worker-02. Le changement de taille
+   prend 2 min 30 et ne demande pas de recréer la machine.
 
 **Deux défauts du script corrigés au passage, avant toute coupure** :
 
