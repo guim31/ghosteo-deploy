@@ -415,7 +415,7 @@ après cette date. Les cinq autres cabinets sont en métropole, créneau de soir
 | Guilhem HENRY | 12/09 08h29 | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
 | Xavier PAGES | | | | |
 | Cédric ROUSSEAU | | | | |
-| Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | | | | |
+| Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | 12/09 09h06 Paris = 03h06 chez lui | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
 | Alexia GAUTHIER | | | | |
 | Adrien BLACHON | | | | |
 | Anaïs DELAUNAY *(Nouvelle-Calédonie, 13h-20h heure de Paris)* | | | | |
@@ -438,6 +438,25 @@ conservé (`6b966a2e…`), licence `GHOSTEO-YOPTEBPTN-MCYQP4RT` intacte, 22 docu
 24 Mo restaurés, aucune migration en attente. Worker-01 : **2 instances sur 12**, 961 Mo de RAM
 utilisés sur 3 909. L'ancienne instance reste en maintenance sur le VPS, intacte, jusqu'au
 12/10/2026 au moins.
+
+### Cabinet d'Aurélien MARIE-JOSEPH migré le 12/09/2026 (Martinique)
+
+Instance #5 sur worker-01 : service `E4k7q9ouYZhkfw_0Qq8gs`
+(appName `ghosteo-aurelien-marie-joseph-ehuq8j`), image 1.17.0, certificat jusqu'au 11/12/2026.
+Bascule à 09h06 heure de Paris, soit **03h06 chez lui**, dans le créneau autorisé par Guilhem.
+**Coupure de 3 min 30** (09h06 → 09h09).
+
+| | patients | consultations | comptabilités | comptes | fichiers patients |
+|---|---|---|---|---|---|
+| Ancienne (MySQL) | 3 805 | 6 493 | 6 493 | 2 | 6 |
+| Nouvelle (SQLite) | 3 805 | 6 493 | 6 493 | 2 | 6 |
+
+21 275 lignes dans 30 tables, déchiffrement vérifié, `hardware_id` conservé, licence
+`GHOSTEO-VIP-WHVZOLXVPPRG` intacte, volume de 18 Mo. Le script a tourné **sans aucune
+intervention** : première migration entièrement automatique.
+
+Worker-01 après deux cabinets et la démo : **3 instances sur 12**, 1 121 Mo de RAM sur 3 909.
+Projection à 12 instances : environ 2,6 Go, ce qui tient dans les 4 Go du DEV1-M.
 
 **Deux défauts du script corrigés au passage, avant toute coupure** :
 
