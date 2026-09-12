@@ -1,5 +1,5 @@
-<!-- Texte prêt à coller dans une issue du dépôt ghosteo.
-     Rédigé le 12/09/2026 ; l'agent n'a pas le droit « Issues » sur le jeton GitHub. -->
+<!-- Issue ouverte le 12/09/2026 : https://github.com/guim31/ghosteo/issues/203
+     Ce fichier garde le texte source, au cas où le ticket serait à rouvrir ou à reformuler. -->
 
 # Titre
 
