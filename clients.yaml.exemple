@@ -8,18 +8,18 @@
 #   repertoire  son répertoire sur le VPS OVH (voir l'inventaire dans SUIVI.md)
 #   worker_ssh  l'alias SSH du serveur d'accueil, dans ~/.ssh/config du Beelink
 #   server_id   l'identifiant Dokploy de ce serveur (server.all)
-#   image       l'image à déployer — JAMAIS antérieure à essai-3 (index SQLite, PR #195)
+#   image       l'image à déployer — une VERSION publiée (1.17.0 ou plus), jamais une image d'essai
 
 guilhem-henry:
   domaine: guilhem-henry.ghosteoapp.eu
   repertoire: /home/guilhemhenry/guilhem-henry.ghosteoapp.eu
   worker_ssh: worker-01
   server_id: zHNG7citX1VozvviOoNga
-  image: ghcr.io/guim31/ghosteo:essai-3
+  image: ghcr.io/guim31/ghosteo:1.17.0
 
 # xavier-pages:
 #   domaine: xavier-pages.ghosteoapp.eu
 #   repertoire: /home/xavierpages/xavier-pages.ghosteoapp.eu
 #   worker_ssh: worker-01
 #   server_id: zHNG7citX1VozvviOoNga
-#   image: ghcr.io/guim31/ghosteo:essai-3
+#   image: ghcr.io/guim31/ghosteo:1.17.0

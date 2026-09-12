@@ -374,11 +374,25 @@ les images lancées à la main existent (`essai-1`, `essai-2`, `essai-3`).
 
 - **Contournement immédiat** : onglet Actions → « Image Docker » → *Run workflow* → branche `main`,
   champ tag `1.17.0`. Produit la même image.
-- **Correctif durable proposé** : faire de `docker.yml` un workflow réutilisable (`workflow_call`)
-  et l'appeler depuis `release.yml` après la pose du tag. Une seule construction, pas de jeton
-  personnel à stocker. Alternative écartée : pousser le tag avec un PAT, qui remettrait un secret
-  de longue durée dans le dépôt. **Demande la permission « Workflows » sur le jeton GitHub**, à
-  redonner temporairement puis à retirer (comme en phase 1).
+- **Correctif durable** : **PR ouverte** https://github.com/guim31/ghosteo/pull/202 le 12/09/2026.
+  `docker.yml` devient appelable (`workflow_call`, entrées `tag` et `latest`) et `release.yml`
+  l'appelle après la pose du tag. Le déclencheur `push: tags` est conservé pour un tag humain, le
+  lancement manuel est inchangé, une seule construction par livraison. Les cinq cas de nommage ont
+  été simulés hors CI. Alternative écartée : pousser le tag avec un jeton personnel, qui aurait mis
+  un secret de longue durée dans le dépôt. **Retirer la permission « Workflows » du jeton GitHub
+  après la fusion** (accordée par Guilhem le 12/09/2026).
+
+### Version 1.17.0 en service (12/09/2026)
+
+- Livrée par Guilhem (PR #201), tag `v1.17.0` posé, **image construite à la main** faute du
+  déclenchement automatique ci-dessus : `ghcr.io/guim31/ghosteo:1.17.0` (993 Mo, 12/09 05:51).
+  Pas de tag `latest` : le lancement manuel ne le pose pas, seul l'appel corrigé le fera.
+- **Démo passée en 1.17.0** : 71 patients, 747 consultations, 2 comptes, déchiffrement OK,
+  `hardware_id` conservé, aucune migration en attente, HTTPS et redirections correctes.
+- Image par défaut du back-office portée à `ghcr.io/guim31/ghosteo:1.17.0`. **Le réglage s'appelle
+  `deploy_image`** et non `dokploy_default_image` : ma première écriture a créé une clé inutile,
+  supprimée depuis. Vérifier le nom dans `SettingController` avant d'écrire un réglage par tinker.
+- **C'est la première image déployable chez un client** : les `essai-*` ne sont plus à utiliser.
 
 ## Phase 5 — Clients
 
