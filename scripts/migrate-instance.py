@@ -36,11 +36,14 @@ from dokploy import call as dokploy          # noqa: E402
 from scw import call as scaleway             # noqa: E402
 
 VPS = "vito@51.178.87.41"
+IP_VPS = "51.178.87.41"           # adresse de l'ancien hébergement, cible du retour arrière
 CONTROL = "control-01"
 ZONE = "ghosteoapp.eu"
 COMPOSE = os.path.join(os.path.dirname(ICI), "compose", "instance.yml")
 DUMP = os.path.join(ICI, "remote-dump.sh")
 ENV_DOKPLOY = "pC_5KlfCgctYLUpawSQS3"   # projet ghosteo, environnement production
+BACKOFFICE = "/home/ghosteoserver/ghosteo.eu"
+SERVEUR_BACKOFFICE = 2                  # worker-01 dans la table « servers »
 
 # Variables imposées par l'hébergement en conteneur, quelles que soient celles d'origine.
 FORCE = {
@@ -94,6 +97,35 @@ def client(nom):
     # transitent donc ni par le Beelink ni par le serveur de contrôle.
     c["travail"] = f"/root/migration-{nom}"
     return c
+
+
+def utilisateur(c):
+    """L'utilisateur isolé du site sur le VPS, déduit de /home/<utilisateur>/<domaine>."""
+    parties = c["repertoire"].strip("/").split("/")
+    if len(parties) < 2 or parties[0] != "home":
+        sortir(f"répertoire inattendu, utilisateur indéductible : {c['repertoire']}")
+    return parties[1]
+
+
+def maintenance(c, activer):
+    """Met l'ancienne instance en maintenance, ou la remet en service.
+
+    Sans ce geste, tout ce qu'un praticien saisit entre la sauvegarde et la bascule est
+    perdu. C'est aussi le retour arrière : « php artisan up » remet l'ancienne en service
+    tant que le DNS n'a pas bougé.
+    """
+    u = utilisateur(c)
+    action = "down --retry=120" if activer else "up"
+    repertoire = c["repertoire"]
+    # Le script part par l'entrée standard : imbriquer des guillemets dans
+    # « ssh sudo bash -c php artisan » a déjà avalé une commande en silence.
+    script = ("set -euo pipefail\n"
+              "sudo -n -u " + u + " bash -c 'cd " + repertoire + " && php artisan " + action + "'\n")
+    p_ = subprocess.run(["ssh", "-o", "ConnectTimeout=15", VPS, "bash -s"],
+                        input=script, capture_output=True, text=True)
+    if p_.returncode != 0:
+        sortir("« php artisan " + action + " » a échoué sur l'ancienne instance :\n" + p_.stderr[:400])
+    print("  ancienne instance " + ("en maintenance" if activer else "REMISE EN SERVICE"))
 
 
 def sortir(message):
@@ -199,17 +231,82 @@ echo "  source : patients=$(q 'SELECT COUNT(*) FROM ghosteo.patients;') consulta
 APPKEY=$(grep -E '^APP_KEY=' {t}/env-ancien | head -1 | cut -d= -f2- | tr -d '"'"'"'\\r')
 [ -n "$APPKEY" ] || {{ echo "APP_KEY introuvable"; exit 1; }}
 rm -f {t}/database.sqlite; install -m 666 /dev/null {t}/database.sqlite
+# Les secrets passent par un fichier en mode 600, JAMAIS par la ligne de commande :
+# « docker run -e CLE=valeur » expose la valeur dans /proc/<pid>/cmdline, donc a tout
+# « ps » lance sur la machine pendant la conversion.
+umask 077
+cat > {t}/.env-conv <<ENVFILE
+APP_KEY=$APPKEY
+APP_ENV=production
+APP_DEBUG=false
+AUTORUN_ENABLED=false
+DB_CONNECTION=sqlite
+DB_DATABASE=/data/database.sqlite
+SOURCE_DB_HOST=conv-mysql
+SOURCE_DB_PORT=3306
+SOURCE_DB_DATABASE=ghosteo
+SOURCE_DB_USERNAME=root
+SOURCE_DB_PASSWORD=$PW
+ENVFILE
 docker run --rm --network conv-net --user root -v {t}/database.sqlite:/data/database.sqlite \\
-  -e APP_KEY="$APPKEY" -e APP_ENV=production -e APP_DEBUG=false -e AUTORUN_ENABLED=false \\
-  -e DB_CONNECTION=sqlite -e DB_DATABASE=/data/database.sqlite \\
-  -e SOURCE_DB_HOST=conv-mysql -e SOURCE_DB_PORT=3306 -e SOURCE_DB_DATABASE=ghosteo \\
-  -e SOURCE_DB_USERNAME=root -e SOURCE_DB_PASSWORD="$PW" \\
+  --env-file {t}/.env-conv \\
   {c['image']} php /var/www/html/artisan app:copy-database --fresh --no-interaction 2>&1 | tail -2
+shred -u {t}/.env-conv 2>/dev/null || rm -f {t}/.env-conv
 docker rm -f conv-mysql >/dev/null 2>&1; docker network rm conv-net >/dev/null 2>&1
 shred -u {t}/.pw 2>/dev/null || rm -f {t}/.pw
 chmod 600 {t}/database.sqlite
 """
-    sh(c["worker_ssh"], script)
+    sortie = sh(c["worker_ssh"], script)
+    # Comptes de la base MySQL source, imprimés par le script ci-dessus.
+    source = {}
+    for ligne in sortie.splitlines():
+        if "source :" in ligne:
+            for morceau in ligne.split("source :", 1)[1].split():
+                if "=" in morceau:
+                    cle, valeur = morceau.split("=", 1)
+                    if valeur.isdigit():
+                        source[cle] = int(valeur)
+    return source
+
+
+def comptes_sqlite(c, chemin):
+    """Comptes lus dans le fichier SQLite produit, avant toute installation."""
+    php = ('foreach (["patients","consultations","users"] as $t) '
+           '{ echo $t."=".DB::table($t)->count()." "; } echo PHP_EOL;')
+    sortie = sh(c["worker_ssh"],
+                f'docker run --rm --user root -v {chemin}:/data/db.sqlite '
+                f'-e DB_CONNECTION=sqlite -e DB_DATABASE=/data/db.sqlite -e AUTORUN_ENABLED=false '
+                f'-e APP_KEY=base64:{"A" * 43}= {c["image"]} '
+                f"php /var/www/html/artisan tinker --execute='{php}' 2>/dev/null | grep patients=",
+                silencieux=True)
+    comptes = {}
+    for morceau in sortie.split():
+        if "=" in morceau:
+            cle, valeur = morceau.split("=", 1)
+            if valeur.isdigit():
+                comptes[cle] = int(valeur)
+    return comptes
+
+
+def verifier_conversion(c, source):
+    """Refuse d'aller plus loin si la copie ne reproduit pas la source, table par table.
+
+    C'est le garde-fou qui rend une bascule non surveillée acceptable : à ce stade
+    l'ancienne instance est en maintenance mais le DNS n'a pas bougé, donc le retour
+    arrière est un simple « php artisan up ».
+    """
+    cible = comptes_sqlite(c, f"{c['travail']}/database.sqlite")
+    if not cible:
+        sortir("impossible de compter les lignes de la base convertie — bascule annulée.")
+    ecarts = [f"{k} : source {v}, copie {cible.get(k, 'absent')}"
+              for k, v in source.items() if cible.get(k) != v]
+    for cle, valeur in sorted(cible.items()):
+        print(f"  {cle} : {valeur} (source {source.get(cle, '?')})")
+    if ecarts:
+        sortir("la copie ne correspond pas à la source :\n  - " + "\n  - ".join(ecarts)
+               + "\nRIEN N'A ÉTÉ BASCULÉ. Remettre l'ancienne instance en service par "
+                 "« php artisan up » et analyser.")
+    print("  copie conforme à la source")
 
 
 # ------------------------------------------------------------------ Dokploy
@@ -250,7 +347,8 @@ def cmd_preparer(c):
     sauvegarder(c, "chaud")
 
     etape("Conversion d'essai vers SQLite (valide la chaîne avant toute coupure)")
-    convertir(c, "chaud")
+    source = convertir(c, "chaud")
+    verifier_conversion(c, source)
 
     etape("Création du service sur le worker")
     st, p = dokploy("POST", "compose.create", {
@@ -304,14 +402,17 @@ def attendre_conteneur(c, minutes=10):
 def cmd_basculer(c):
     """Le créneau : coupure de quelques minutes."""
     _, app = app_name(c)
-    print("RAPPEL : l'ancienne instance doit être en maintenance (php artisan down) "
-          "avant cette étape, sinon les saisies faites depuis sont perdues.")
+    etape("Mise en maintenance de l'ancienne instance")
+    maintenance(c, True)
 
     etape("Sauvegarde à froid")
     sauvegarder(c, "froid")
 
     etape("Conversion vers SQLite")
-    convertir(c, "froid")
+    source = convertir(c, "froid")
+
+    etape("Contrôle de la copie avant toute bascule")
+    verifier_conversion(c, source)
 
     etape("Installation dans le volume de la nouvelle instance")
     # Tout est déjà sur le worker : aucune copie ne passe par le Beelink.
@@ -356,6 +457,26 @@ du -sh "$V/app" | sed 's/^/  volume : /'
     cmd_verifier(c)
 
 
+def cmd_retour_arriere(c):
+    """Remet le client sur son ancienne instance : adresse puis sortie de maintenance.
+
+    Dans cet ordre, et pas l'inverse : sortir l'ancienne de maintenance avant de rendre
+    l'adresse ferait servir deux instances différentes selon le cache du visiteur.
+    """
+    etape("RETOUR ARRIÈRE")
+    dns_set(c["domaine"], IP_VPS, 60)
+    for _ in range(60):
+        if dns_lu(c["domaine"]) == IP_VPS:
+            break
+        time.sleep(5)
+    print(f"  adresse rendue à l'ancien serveur : {c['domaine']} → {IP_VPS}")
+    maintenance(c, False)
+    code = sh(CONTROL, f"curl -s -o /dev/null -w '%{{http_code}}' --max-time 15 "
+                       f"https://{c['domaine']}/login || true", silencieux=True).strip()
+    print(f"  l'ancienne instance répond : {code}")
+    print("  La nouvelle instance reste en place sur le worker, à analyser à froid.")
+
+
 def cmd_verifier(c):
     """Contrôles finaux, depuis control-01 : le résolveur de la maison ment."""
     _, app = app_name(c)
@@ -376,15 +497,55 @@ docker exec {app}-web-1 php /var/www/html/artisan migrate:status 2>&1 | grep -c 
     print(f"  L'ancienne instance reste intacte sur le VPS pendant 30 jours.")
 
 
+def cmd_backoffice(c):
+    """Rattache l'instance à son nouveau serveur dans le back-office ghosteo.eu.
+
+    Le PHP part par l'entrée standard d'un script, jamais dans une chaîne de commande :
+    imbriquer des guillemets dans « ssh sudo bash -c php artisan tinker --execute » est
+    ingérable et a déjà avalé silencieusement deux commandes.
+    """
+    cid, _ = app_name(c)
+    ip = sh(c["worker_ssh"], "curl -s --max-time 10 https://ifconfig.me", silencieux=True).strip()
+    etape("Rattachement dans le back-office")
+    script = f"""set -euo pipefail
+cat > /tmp/.rattache-$$.php <<'PHP'
+<?php
+$i = \\App\\Models\\Instance::where('url', 'like', '%{c["domaine"]}%')->first();
+if (! $i) {{ echo 'INSTANCE INTROUVABLE POUR {c["domaine"]}', PHP_EOL; exit(1); }}
+$i->server_id = {SERVEUR_BACKOFFICE};
+$i->dokploy_compose_id = '{cid}';
+$i->ip = '{ip}';
+$i->vito_server_id = null;
+$i->vito_site_id = null;
+$i->save();
+echo 'instance #', $i->id, ' ', $i->name, ' -> serveur ', $i->server_id, PHP_EOL;
+PHP
+chmod 644 /tmp/.rattache-$$.php
+trap 'rm -f /tmp/.rattache-$$.php' EXIT
+sudo -n -u ghosteoserver bash -c "cd {BACKOFFICE} && php artisan tinker /tmp/.rattache-$$.php" 2>/dev/null | grep -E 'instance #|INTROUVABLE' | sed 's/^/  /'
+"""
+    p_ = subprocess.run(["ssh", "-o", "ConnectTimeout=15", VPS, "bash -s"],
+                        input=script, capture_output=True, text=True)
+    sortie = (p_.stdout or "").strip()
+    print(sortie or "  (aucune réponse du back-office)")
+    if "INTROUVABLE" in sortie or not sortie:
+        sortir("rattachement au back-office impossible — à faire à la main.")
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("commande", choices=["ttl", "preparer", "basculer", "verifier"])
+    p.add_argument("commande", choices=["ttl", "preparer", "basculer", "verifier",
+                                       "maintenance", "service", "backoffice",
+                                       "retour-arriere"])
     p.add_argument("client")
     a = p.parse_args()
     c = client(a.client)
     print(f"Client « {c['nom']} » — {c['domaine']} vers {c['worker_ssh']}, image {c['image']}")
-    {"ttl": cmd_ttl, "preparer": cmd_preparer,
-     "basculer": cmd_basculer, "verifier": cmd_verifier}[a.commande](c)
+    {"ttl": cmd_ttl, "preparer": cmd_preparer, "basculer": cmd_basculer,
+     "verifier": cmd_verifier, "backoffice": cmd_backoffice,
+     "maintenance": lambda x: maintenance(x, True),
+     "service": lambda x: maintenance(x, False),
+     "retour-arriere": cmd_retour_arriere}[a.commande](c)
 
 
 if __name__ == "__main__":

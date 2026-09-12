@@ -513,6 +513,72 @@ parent. Un cabinet de deux ou trois praticiens ne dépassera pas quelques mégao
    Corrigé par `set -o pipefail`. Sans cette découverte, la bascule aurait installé une base
    vide chez un client.
 
+### Bascules programmées le 12/09/2026
+
+Tous les clients ont été prévenus par Guilhem. Deux entrées de crontab **sur le Beelink**
+(donc durables, contrairement à un minuteur interne à l'agent, qui disparaîtrait au
+redémarrage du superviseur) :
+
+| Heure | Cabinets | Heure locale du praticien |
+|---|---|---|
+| 14h07 | `anais-delaunay` | 00h07 en Nouvelle-Calédonie |
+| 21h00 | `xavier-pages`, `cedric-rousseau`, `alexia-gauthier`, `cabinet-blachon-thivillier` | idem, métropole |
+
+Les deux lignes portent `--auto-retrait` : `cutover.sh` retire sa propre entrée de crontab
+après exécution. Une bascule est un geste unique ; une entrée oubliée rejouerait la migration
+d'un cabinet déjà migré, avec les données devenues obsolètes du VPS.
+
+**Les cinq instances sont préparées à l'avance** (`preparer`, sans coupure) : sauvegarde à
+chaud, conversion d'essai, contrôle de conformité, création du service, déploiement. Si une
+conversion doit échouer, c'est découvert le matin, pas dans le créneau.
+
+Journal des bascules : `~/ghosteo-bascule.log` sur le Beelink.
+
+### Garde-fous ajoutés avant d'automatiser (12/09/2026)
+
+Une bascule sans surveillance n'était pas acceptable en l'état. Quatre ajouts :
+
+1. **Contrôle de conformité de la copie** (`verifier_conversion`) : les comptes de la base
+   SQLite produite sont comparés à ceux de la source MySQL, table par table, **avant**
+   d'installer quoi que ce soit et avant de toucher au DNS. En cas d'écart, rien ne bascule.
+   Testé en injectant un faux compte source : l'exécution s'arrête bien.
+2. **Retour arrière automatique** (`retour-arriere`) : rend l'adresse à l'ancien serveur, puis
+   sort l'ancienne instance de maintenance — dans cet ordre, l'inverse ferait servir deux
+   instances différentes selon le cache du visiteur. Appelé par `cutover.sh` à tout échec.
+3. **Maintenance et rattachement dans l'outil** (`maintenance`, `service`, `backoffice`) : plus
+   de gestes manuels dans le créneau, et le back-office se rattache par URL, sans identifiant
+   codé en dur.
+4. **`python3 -u` dans `cutover.sh`** : sans cela Python garde sa sortie en mémoire jusqu'à la
+   fin et le journal reste muet pendant toute la bascule — inacceptable pour surveiller a
+   posteriori.
+
+**Piège de quoting, rencontré trois fois** : `ssh … sudo -u X bash -c "… php artisan tinker
+--execute='…'"` est ingérable et **échoue en silence** (la commande est mal découpée, le code de
+retour reste 0). Tout PHP ou artisan distant part désormais par l'entrée standard d'un script
+(`ssh VPS bash -s` avec un heredoc), comme `scripts/remote-counts.sh`.
+
+### Incident : clé de chiffrement d'une instance exposée (12/09/2026)
+
+En diagnostiquant la lenteur apparente d'une préparation, l'agent a affiché la liste des
+processus du worker. Or la conversion passait alors ses secrets **en ligne de commande**
+(`docker run -e APP_KEY=… -e SOURCE_DB_PASSWORD=…`), donc visibles dans
+`/proc/<pid>/cmdline` et dans cette sortie. Se sont retrouvés dans la conversation :
+
+- l'**`APP_KEY` de l'instance `anais-delaunay`** — sérieux : cette clé chiffre les champs
+  patients (nom, adresse, téléphone, numéro de sécurité sociale…) **et signe les cookies de
+  session**, donc elle vaut identifiant d'accès à son instance ;
+- un mot de passe MySQL temporaire, sans portée (le conteneur est détruit à la fin).
+
+**Corrigé** : les secrets passent par un fichier `--env-file` en mode 600, effacé au `shred`
+après usage. Vérifié : plus aucun secret dans les lignes de commande générées.
+
+**Décision à prendre par Guilhem** : faire tourner la clé d'`anais-delaunay`, ou l'accepter.
+La rotation n'est pas triviale et **aucune commande ne l'implémente** dans `ghosteo`. La voie
+propre existe pourtant : Laravel sait déchiffrer avec `APP_PREVIOUS_KEYS` pendant qu'on
+réenregistre les données avec la nouvelle clé. Cela demande une commande artisan à écrire
+(parcourir tous les modèles à champs `encrypted` et les resauvegarder), donc une issue et une
+PR sur `ghosteo`. Non bloquant pour les migrations en cours.
+
 ## Phase 6 — Fin
 
 - [ ] ghosteo.eu basculé
