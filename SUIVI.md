@@ -700,7 +700,36 @@ fonctionne pas** (« fetch failed ») : le conteneur Dokploy n'atteint pas l'age
 sur l'hôte. Lire l'agent directement est de toute façon préférable — un appel HTTP de moins
 et aucune dépendance à une API jeune.
 
-### Le point de transport, à trancher
+### Ce qui est fait : PR https://github.com/guim31/ghosteoeu-main/pull/63 (12/09/2026)
+
+- **Un bloc de métriques par serveur déclaré**, alimenté par `AgentMetricsReader` qui lit
+  l'agent directement (un GET, pas de dépendance à l'API du panneau). Le relevé de la machine
+  du moniteur ne s'affiche plus que si elle porte encore des instances, sous le titre
+  « Ancien hébergement », et disparaîtra de lui-même.
+- **Version déployée lue dans `GHOSTEO_IMAGE`** (`DokployClient::deployedVersion`), donc
+  immédiate. Les deux versions sont conservées : un écart signale un conteneur redéployé mais
+  pas redémarré. `Instance::effectiveVersion()` et `versionMismatch()`.
+- **Liste des contrôles paginée** par 20 au lieu de 100 lignes d'un coup.
+- Nouvelles colonnes : `servers.metrics_host`, `servers.metrics_port`,
+  `instances.deployed_version`, `instances.deployed_version_at`. Nouveau réglage chiffré
+  `metrics_agent_token`.
+- Contrôles sur le banc du NAS : Pint 292 fichiers, **423 tests**, PHPStan sans erreur.
+  *Piège du banc* : PHPStan meurt en « 4 errors » trompeuses si la mémoire PHP reste à 256 Mo.
+  Lancer avec `--memory-limit=1G`.
+
+### Le point de transport
+
+**VPC créé** le 12/09/2026 (`ghosteo`, `e4df5e22-69dc-4b9e-9567-b00c800da084`) après ajout de
+`VPCFullAccess` par Guilhem. Mais la création du **réseau privé** reste refusée : la ressource
+s'appelle `compute_private_networks` et demande une permission distincte, vraisemblablement
+`PrivateNetworksFullAccess`, à ajouter à la politique `beelink-migration`.
+
+Tant que le réseau privé n'existe pas, `metrics_host` reste vide et les blocs affichent
+« Aucune adresse d'agent de métriques renseignée » — explicitement, et non un tiret muet.
+À noter : le back-office tourne encore sur le VPS OVH, hors du futur réseau privé ; les
+métriques ne seront donc complètes qu'après la bascule de ghosteo.eu (phase 6).
+
+
 
 Le port 4500 du worker **n'est pas joignable depuis le panneau** (groupe de sécurité : 22, 80,
 443 seulement). Vérifié. Trois voies :
