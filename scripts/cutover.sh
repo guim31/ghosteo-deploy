@@ -46,6 +46,19 @@ for client in "$@"; do
     else
       resume="$resume$client : ÉCHEC ET RETOUR ARRIÈRE EN ÉCHEC — intervention nécessaire"$'\n'
     fi
+    # On s'arrête au premier échec quand plusieurs cabinets sont demandés. Le
+    # 12/09/2026, enchaîner malgré un échec a fait perdre trois cabinets au lieu
+    # d'un : la cause était commune (quota de certificats), et chaque tentative
+    # supplémentaire l'aggravait. Un échec se comprend avant de réessayer.
+    if [ "$#" -gt 1 ]; then
+      restants=""
+      for suivant in "$@"; do
+        [ "$suivant" = "$client" ] && { restants="DEMARRE"; continue; }
+        [ "$restants" = "DEMARRE" ] && resume="$resume$suivant : non tenté (arrêt après l'échec précédent)"$'\n'
+      done
+      echo "$(date '+%F %T') >>> arrêt de la série après l'échec de $client" >> "$LOG"
+      break
+    fi
   fi
 done
 

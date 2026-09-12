@@ -413,7 +413,7 @@ après cette date. Les cinq autres cabinets sont en métropole, créneau de soir
 | Client | Créneau | Migré le | Vérifié par le client | Ancienne instance éteinte le |
 |---|---|---|---|---|
 | Guilhem HENRY | 12/09 08h29 | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
-| Xavier PAGES | | | | |
+| Xavier PAGES | 12/09 21h00 | **12/09/2026** | à faire | après le 12/10/2026 |
 | Cédric ROUSSEAU | | | | |
 | Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | 12/09 09h06 Paris = 03h06 chez lui | **12/09/2026**, coupure 3 min 30 | prévenu par message le 12/09, réponse attendue à son réveil | après le 12/10/2026 |
 | Alexia GAUTHIER | | | | |
@@ -804,6 +804,50 @@ Le port 4500 du worker **n'est pas joignable depuis le panneau** (groupe de séc
 | Réseau privé Scaleway (VPC) | le plus propre, gratuit, rien d'exposé | la clé du Beelink **n'a pas le droit VPC** ; demande une permission et un rattachement des deux machines |
 | Publier l'agent en HTTPS derrière Traefik | chiffré, aucune règle de pare-feu à ajouter | crée une adresse publique de plus, protégée par le seul jeton |
 | Ouvrir 4500 à la seule IP du back-office | simple | **jeton en clair sur Internet**, l'agent ne fait que du HTTP |
+
+### Échec des bascules du 12/09 à 21h : quota de certificats Let's Encrypt
+
+**Un cabinet sur quatre est passé.** Xavier Pagès migré et vérifié. Cédric Rousseau, Alexia
+Gauthier et Adrien Blachon ont échoué sur « pas de certificat après 5 minutes » et ont été
+**rendus à l'ancien serveur par le retour arrière automatique** : aucun client n'a été coupé
+au-delà de sa fenêtre, les trois répondaient en 200 dans la minute.
+
+**Cause, en deux fautes de conception de la procédure, pas une panne.**
+
+1. **Le domaine était déclaré dans `preparer`, avant la bascule d'adresse.** Traefik demandait
+   donc le certificat pendant que le nom pointait encore vers l'ancien serveur : le défi ACME
+   échouait. Or Let's Encrypt n'accorde que **cinq échecs de validation par nom et par heure**,
+   et chaque redémarrage du routeur — que la procédure faisait à chaque bascule — relançait une
+   tentative pour *tous* les noms en attente. Les trois derniers cabinets avaient épuisé leur
+   quota avant même leur tour. Xavier est passé parce qu'il était premier.
+2. **Les vérifications passaient par un résolveur.** Le cache DNS de control-01 a fait prendre
+   l'ANCIEN serveur pour le nouveau, et une bascule ratée pour une réussie : à 23h24 le script
+   a annoncé « certificat en place » en mesurant en réalité l'ancienne instance. C'est la
+   troisième fois que ce cache trompe une vérification.
+
+**Troisième enseignement, découvert en réparant** : `domain.delete` retire le domaine de la
+base de Dokploy mais **pas les étiquettes Traefik des conteneurs déjà créés**, et
+`compose.redeploy` ne les régénère pas. Traefik continue donc de voir le nom et de retenter
+ACME, consommant le quota en silence. Inerte tant que le DNS pointe ailleurs et que le routeur
+n'est pas redémarré, mais à savoir.
+
+**Corrections apportées le 12/09/2026 au soir :**
+
+- `declarer_domaine()` : le domaine n'est déclaré **qu'après** la bascule d'adresse, suivi d'un
+  redéploiement (les étiquettes Traefik se posent à la création des conteneurs). Le
+  redémarrage de Traefik disparaît, devenu inutile.
+- **Marge de 90 s après la bascule DNS** avant de déclarer le domaine : le serveur de noms est
+  à jour immédiatement, mais Let's Encrypt valide depuis ses propres résolveurs, qui peuvent
+  servir l'ancienne réponse pendant la durée du TTL (60 s).
+- **Tous les contrôles HTTPS visent l'adresse du serveur d'accueil** (`curl --resolve`), sans
+  jamais passer par un résolveur. Éprouvé sur Xavier : DNS conforme, `/up` et `/login` 200,
+  certificat à son nom.
+- `cutover.sh` **s'arrête au premier échec** quand plusieurs cabinets sont demandés, et signale
+  les non tentés. Enchaîner malgré un échec a coûté trois cabinets au lieu d'un, la cause étant
+  commune et chaque tentative l'aggravant.
+
+**Reprise programmée le 13/09 à 00h35**, soit plus d'une heure après le dernier échec (23h25),
+le temps que le quota se libère. Les trois cabinets, un à la fois, arrêt au premier échec.
 
 ## Phase 6 — Fin
 

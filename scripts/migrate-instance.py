@@ -374,16 +374,17 @@ def cmd_preparer(c):
                     {"composeId": cid, "env": construire_env(c), "createEnvFile": True})
     print(f"  enregistrées (HTTP {st})")
 
-    etape("Domaine et certificat")
-    st, _ = dokploy("POST", "domain.create", {
-        "host": c["domaine"], "composeId": cid, "serviceName": "web", "port": 8080,
-        "https": True, "certificateType": "letsencrypt", "domainType": "compose", "path": "/"})
-    print(f"  déclaré (HTTP {st}) — le certificat échouera tant que le DNS pointe ailleurs, c'est normal")
+    # Le domaine n'est PAS déclaré ici : voir declarer_domaine(). Le déclarer avant la
+    # bascule d'adresse faisait échouer ACME en boucle et épuisait le quota de Let's
+    # Encrypt (5 échecs de validation par nom et par heure), au point que trois
+    # cabinets sur quatre n'ont pas pu obtenir leur certificat le 12/09/2026.
 
     etape("Déploiement")
     dokploy("POST", "compose.deploy", {"composeId": cid, "title": f"Migration {c['nom']}"})
     attendre_conteneur(c)
     print("\n  Prêt. L'ancienne instance sert toujours les clients.")
+    print("  Le domaine sera déclaré à la bascule, pas avant : sinon ACME échoue en")
+    print("  boucle sur un nom qui pointe encore ailleurs, et épuise le quota.")
     print(f"  Étape suivante, dans le créneau convenu : migrate-instance.py basculer {c['nom']}")
 
 
@@ -449,19 +450,57 @@ du -sh "$V/app" | sed 's/^/  volume : /'
         time.sleep(5)
     print(f"  serveur de noms à jour : {c['domaine']} → {ip}")
 
-    etape("Certificat")
-    # Traefik cesse de retenter après les échecs d'avant la bascule : le redémarrage relance.
-    sh(c["worker_ssh"], "docker restart dokploy-traefik >/dev/null && echo '  Traefik redémarré'")
+    # Le serveur de noms est à jour, mais pas forcément les résolveurs de Let's Encrypt,
+    # qui valident le défi ACME depuis leur propre cache. Avec un TTL de 60 s, attendre
+    # 90 s garantit que plus personne ne sert l'ancienne adresse. Sans cette marge, le
+    # défi part vers l'ANCIEN serveur, échoue, et consomme le quota de cinq échecs par
+    # nom et par heure — ce qui a coûté trois cabinets le 12/09/2026.
+    print("  attente de 90 s pour que l'ancienne réponse expire partout…")
+    time.sleep(90)
+
+    etape("Domaine et certificat")
+    declarer_domaine(c)
+    # --resolve, impérativement : le résolveur de control-01 garde l'ancienne adresse en
+    # cache et a deux fois fait passer une bascule ratée pour une réussite, en mesurant
+    # l'ANCIEN serveur (qui répondait, puisqu'il n'était pas encore éteint).
     for _ in range(60):
-        code = sh(CONTROL, f"curl -s -o /dev/null -w '%{{http_code}}' --max-time 10 https://{c['domaine']}/up || true",
+        code = sh(CONTROL,
+                  f"curl -s -o /dev/null -w '%{{http_code}}' --max-time 10 "
+                  f"--resolve {c['domaine']}:443:{ip} https://{c['domaine']}/up || true",
                   silencieux=True).strip()
         if code == "200":
-            print("  certificat en place, l'instance répond en HTTPS")
+            print(f"  certificat en place, l'instance répond en HTTPS sur {ip}")
             break
         time.sleep(5)
     else:
-        sortir("pas de certificat après 5 minutes — vérifier le journal de dokploy-traefik")
+        sortir("pas de certificat après 5 minutes. Vérifier le journal de dokploy-traefik : "
+               "un « too many failed authorizations » signifie que le quota Let's Encrypt du nom "
+               "est épuisé, et qu'il faut attendre une heure après le dernier échec.")
     cmd_verifier(c)
+
+
+def declarer_domaine(c):
+    """Déclare le domaine et redéploie, pour que Traefik demande le certificat.
+
+    À n'appeler qu'APRÈS la bascule d'adresse. Let's Encrypt n'accorde que cinq échecs
+    de validation par nom et par heure : déclarer le domaine tant que le nom pointe
+    ailleurs fait échouer ACME, et chaque redémarrage du routeur relance une tentative
+    pour tous les noms en attente. Le 12/09/2026, trois cabinets sur quatre ont épuisé
+    leur quota avant même leur tour.
+
+    Le redéploiement est nécessaire : les étiquettes Traefik du domaine sont posées à la
+    création des conteneurs. Il recrée les conteneurs sans toucher au volume, donc sans
+    perdre la base ni les documents.
+    """
+    cid, _ = app_name(c)
+    st, p = dokploy("POST", "domain.create", {
+        "host": c["domaine"], "composeId": cid, "serviceName": "web", "port": 8080,
+        "https": True, "certificateType": "letsencrypt", "domainType": "compose", "path": "/"})
+    if st != 200:
+        sortir(f"déclaration du domaine refusée (HTTP {st}) : {p}")
+    print("  domaine déclaré")
+    dokploy("POST", "compose.redeploy", {"composeId": cid, "title": f"Domaine de {c['nom']}"})
+    attendre_conteneur(c)
 
 
 def cmd_retour_arriere(c):
@@ -488,12 +527,15 @@ def cmd_verifier(c):
     """Contrôles finaux, depuis control-01 : le résolveur de la maison ment."""
     _, app = app_name(c)
     etape("Vérification")
-    sh(CONTROL, f"""echo "  adresse   : $(dig +short A {c['domaine']} @8.8.8.8)"
-echo "  /up       : $(curl -s -o /dev/null -w '%{{http_code}}' --max-time 15 https://{c['domaine']}/up)"
-echo "  /login    : $(curl -s -o /dev/null -w '%{{http_code}}' --max-time 15 https://{c['domaine']}/login)"
-echo "  http      : $(curl -s -o /dev/null -w '%{{http_code}} vers %{{redirect_url}}' --max-time 15 http://{c['domaine']}/)"
-echo "  servi par : $(curl -s -o /dev/null -w '%{{remote_ip}}' --max-time 15 https://{c['domaine']}/up)"
-echo "  certificat: $(echo | openssl s_client -connect {c['domaine']}:443 -servername {c['domaine']} 2>/dev/null | openssl x509 -noout -enddate)" """)
+    ip = sh(c["worker_ssh"], "curl -s --max-time 10 https://ifconfig.me", silencieux=True).strip()
+    # Chaque contrôle vise l'adresse du serveur d'accueil, sans passer par un résolveur :
+    # une vérification qui interroge le DNS peut mesurer l'ancien serveur et conclure à tort.
+    sh(CONTROL, f"""R="--resolve {c['domaine']}:443:{ip} --resolve {c['domaine']}:80:{ip}"
+echo "  adresse au DNS   : $(dig +short A {c['domaine']} @8.8.8.8) (attendu {ip})"
+echo "  /up              : $(curl -s $R -o /dev/null -w '%{{http_code}}' --max-time 15 https://{c['domaine']}/up)"
+echo "  /login           : $(curl -s $R -o /dev/null -w '%{{http_code}}' --max-time 15 https://{c['domaine']}/login)"
+echo "  http redirige    : $(curl -s $R -o /dev/null -w '%{{http_code}} vers %{{redirect_url}}' --max-time 15 http://{c['domaine']}/)"
+echo "  certificat       : $(echo | openssl s_client -connect {ip}:443 -servername {c['domaine']} 2>/dev/null | openssl x509 -noout -subject -enddate | tr '\\n' ' ')" """)
     sh(c["worker_ssh"], f"""docker exec {app}-web-1 php /var/www/html/artisan tinker --execute='
 echo "  patients=".DB::table("patients")->count()." consultations=".DB::table("consultations")->count()." utilisateurs=".DB::table("users")->count().PHP_EOL;
 echo "  dechiffrement : ".(\\App\\Models\\Patient::orderBy("id")->first()->nom ?? "AUCUN PATIENT").PHP_EOL;
