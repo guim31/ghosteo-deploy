@@ -593,6 +593,39 @@ il faudrait une commande artisan parcourant tous les modèles à champs `encrypt
 concernés sur `Patient` : nom, nom d'usage, prénom, adresse, téléphones, e-mail, numéro de
 sécurité sociale.
 
+### Aurélien signale que son site ne fonctionne plus (12/09/2026, ~13h30)
+
+Guilhem le teste depuis chez lui : ça marche. Investigation côté serveur, **rien trouvé** :
+
+| Contrôle | Résultat |
+|---|---|
+| Enregistrement A, chez Scaleway et chez Cloudflare, Google, Quad9 | `51.15.247.226`, correct partout |
+| Enregistrement AAAA (piste IPv6) | aucun, sur aucun résolveur |
+| Conteneurs de son instance | les trois sains, `web` *healthy* |
+| Ancien serveur, s'il est encore atteint | 503, maintenance — **ce qu'il verrait si son DNS était périmé** |
+| Nouveau serveur | 302 vers `/login`, puis 200 |
+| Licence | `active`, pas de mode dégradé, ping au serveur de licence réussi |
+| Comptes | `#1` inactif, `#2` actif — **identique à l'ancienne instance**, rien n'a changé |
+| Chaîne de certificat | complète (feuille + YR1 + ISRG Root YR), `Verify return code: 0` |
+| En-têtes servis | 302 vers la bonne URL, cookies posés, HSTS présent |
+
+**Le fait qui oriente** : en trois heures, **une seule** requête de son côté est arrivée sur la
+nouvelle instance, depuis un iPhone à 12h42 UTC ; elle a reçu le 302 et n'a pas suivi vers
+`/login`. Tout le reste du trafic vient de la maison de Guilhem, du moniteur et de sondes.
+
+Hypothèse de tête, cohérente avec ces faits : **son résolveur DNS (téléphone, box ou
+fournisseur) sert encore l'ancienne adresse**, où l'instance est en maintenance. Il verrait
+donc une page de maintenance, ce qui se raconte comme « le site ne fonctionne plus ». Le test
+qui tranche en dix secondes : lui faire couper le Wi-Fi pour passer en données mobiles, ce qui
+change de résolveur.
+
+Reste à obtenir de lui **ce qu'il voit exactement**. Sans ce renseignement, l'investigation
+côté serveur est épuisée.
+
+**Détail relevé au passage, à nettoyer sans urgence** : l'en-tête
+`strict-transport-security` est émis **deux fois**, par nginx dans l'image et par Traefik.
+Sans effet fonctionnel, mais à dédoublonner.
+
 ## Phase 6 — Fin
 
 - [ ] ghosteo.eu basculé
