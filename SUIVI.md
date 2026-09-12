@@ -528,9 +528,19 @@ Les deux lignes portent `--auto-retrait` : `cutover.sh` retire sa propre entrée
 après exécution. Une bascule est un geste unique ; une entrée oubliée rejouerait la migration
 d'un cabinet déjà migré, avec les données devenues obsolètes du VPS.
 
-**Les cinq instances sont préparées à l'avance** (`preparer`, sans coupure) : sauvegarde à
-chaud, conversion d'essai, contrôle de conformité, création du service, déploiement. Si une
-conversion doit échouer, c'est découvert le matin, pas dans le créneau.
+**Les cinq instances sont préparées** (`preparer`, sans coupure) et attendent leur créneau :
+sauvegarde à chaud, conversion, contrôle de conformité, création du service, déploiement.
+Conteneurs sains, adresses encore sur l'ancien serveur. Worker-01 : 8 instances (3 en service,
+5 en attente), 1 781 Mo de RAM sur 3 909, disque à 37 %.
+
+**Faux positif du garde-fou, corrigé** : les quatre premières préparations ont été refusées
+alors que les copies étaient exactes (7 011 patients pour 7 011, 10 952 pour 10 952). Le
+comptage source parlait « utilisateurs » quand la copie parlait « users » : le comparateur
+concluait à une table manquante. Corrigé en n'employant que des noms de tables, et durci —
+il refuse désormais de conclure s'il n'a aucune table en commun à comparer, au lieu de
+traiter une absence comme un écart. Éprouvé sur trois cas : copie conforme, écart réel,
+absence de correspondance. **Le sens de l'échec était le bon** : refuser de basculer plutôt
+que laisser passer une copie douteuse.
 
 Journal des bascules : `~/ghosteo-bascule.log` sur le Beelink.
 

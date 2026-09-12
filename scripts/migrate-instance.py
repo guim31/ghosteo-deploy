@@ -227,7 +227,7 @@ done
 docker exec -e MYSQL_PWD="$PW" conv-mysql mysqladmin -uroot --protocol=TCP -h127.0.0.1 ping >/dev/null
 zcat {t}/db-{suffixe}.sql.gz | docker exec -i -e MYSQL_PWD="$PW" conv-mysql mysql -uroot --protocol=TCP -h127.0.0.1 ghosteo
 q() {{ docker exec -e MYSQL_PWD="$PW" conv-mysql mysql -uroot --protocol=TCP -h127.0.0.1 -N -e "$1"; }}
-echo "  source : patients=$(q 'SELECT COUNT(*) FROM ghosteo.patients;') consultations=$(q 'SELECT COUNT(*) FROM ghosteo.consultations;') utilisateurs=$(q 'SELECT COUNT(*) FROM ghosteo.users;')"
+echo "  source : patients=$(q 'SELECT COUNT(*) FROM ghosteo.patients;') consultations=$(q 'SELECT COUNT(*) FROM ghosteo.consultations;') users=$(q 'SELECT COUNT(*) FROM ghosteo.users;')"
 APPKEY=$(grep -E '^APP_KEY=' {t}/env-ancien | head -1 | cut -d= -f2- | tr -d '"'"'"'\\r')
 [ -n "$APPKEY" ] || {{ echo "APP_KEY introuvable"; exit 1; }}
 rm -f {t}/database.sqlite; install -m 666 /dev/null {t}/database.sqlite
@@ -298,10 +298,17 @@ def verifier_conversion(c, source):
     cible = comptes_sqlite(c, f"{c['travail']}/database.sqlite")
     if not cible:
         sortir("impossible de compter les lignes de la base convertie — bascule annulée.")
-    ecarts = [f"{k} : source {v}, copie {cible.get(k, 'absent')}"
-              for k, v in source.items() if cible.get(k) != v]
-    for cle, valeur in sorted(cible.items()):
-        print(f"  {cle} : {valeur} (source {source.get(cle, '?')})")
+    communes = sorted(set(source) & set(cible))
+    if not communes:
+        sortir("aucune table comparable entre la source et la copie — bascule annulée. "
+               "Les deux comptages doivent employer les mêmes noms de tables.")
+    ecarts = [f"{k} : source {source[k]}, copie {cible[k]}"
+              for k in communes if source[k] != cible[k]]
+    ignorees = sorted(set(source) ^ set(cible))
+    if ignorees:
+        print(f"  (non comparé, faute de correspondance : {', '.join(ignorees)})")
+    for cle in communes:
+        print(f"  {cle} : {cible[cle]} (source {source[cle]})")
     if ecarts:
         sortir("la copie ne correspond pas à la source :\n  - " + "\n  - ".join(ecarts)
                + "\nRIEN N'A ÉTÉ BASCULÉ. Remettre l'ancienne instance en service par "
