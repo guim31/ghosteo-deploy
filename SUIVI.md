@@ -494,7 +494,11 @@ parent. Un cabinet de deux ou trois praticiens ne dépassera pas quelques mégao
    processus qui dorment (0,1 % de CPU). Leur `shmem` de 27 Mo chacun est le cache de code PHP :
    `opcache.memory_consumption` vaut 128 Mo alors que **8 Mo seulement sont utilisés**, et
    `opcache.enable_cli` est actif. Le réduire dans l'image économiserait ~50 Mo par instance,
-   soit 600 Mo à douze cabinets. À faire par une PR sur `ghosteo`, pas en urgence.
+   soit 600 Mo à douze cabinets. Pas urgent, Guilhem a demandé une issue plutôt qu'une PR.
+   **Texte prêt à coller dans `notes/issue-opcache.md`** : le jeton GitHub n'a pas le droit
+   « Issues » (il a « Pull requests » mais pas « Issues »), donc l'agent ne peut pas la créer.
+   Soit Guilhem la crée en copiant ce fichier, soit il ajoute la permission Issues en lecture et
+   écriture et l'agent s'en charge.
 2. Repasser worker-01 en DEV1-L (8 Go, 31,27 €), ou créer worker-02. Le changement de taille
    prend 2 min 30 et ne demande pas de recréer la machine.
 
