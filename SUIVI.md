@@ -619,8 +619,31 @@ donc une page de maintenance, ce qui se raconte comme « le site ne fonctionne p
 qui tranche en dix secondes : lui faire couper le Wi-Fi pour passer en données mobiles, ce qui
 change de résolveur.
 
-Reste à obtenir de lui **ce qu'il voit exactement**. Sans ce renseignement, l'investigation
-côté serveur est épuisée.
+**Cause trouvée, et reproduite** (12/09/2026). Aurélien a essayé en navigation privée : ça
+fonctionne. Ce n'était donc ni le DNS ni le serveur, mais une donnée conservée par son
+navigateur. Reproduction sur la démo, en supprimant les sessions puis en rejouant son cas :
+
+| Situation | Réponse |
+|---|---|
+| Visite avec un cookie de session devenu orphelin | **200**, aucun problème |
+| Envoi du formulaire avec l'**ancien jeton anti-CSRF** (page ouverte ou en cache d'avant la migration) | **419 « Session expirée »** |
+| Même envoi avec un jeton frais | 302, connexion normale |
+
+`app:copy-database` exclut volontairement la table `sessions` (elle est dans sa liste `SKIP`,
+avec `cache`, `jobs`…). **Tout client connecté est donc déconnecté par la migration**, ce qui
+est sain. Mais s'il avait la page de connexion ouverte ou en cache, son jeton anti-CSRF est
+périmé et l'envoi du formulaire renvoie une page « Session expirée » — que le praticien lit
+comme « mon logiciel ne marche plus ».
+
+**Ce n'est pas un incident, c'est un effet de bord prévisible de toute migration**, et il
+touchera les quatre cabinets de ce soir. La parade est un message, pas du code : après la
+bascule, **recharger la page** (ou fermer puis réouvrir l'onglet) avant de se reconnecter.
+À ajouter au message type envoyé aux clients, dans le guide.
+
+**Amélioration possible, à ne pas faire dans l'urgence** : la page 419 de GHosteo est soignée
+(titre « Session expirée - GHosteo ») mais c'est un cul-de-sac. Beaucoup d'applications
+Laravel renvoient l'utilisateur vers la page de connexion avec un jeton frais et un message,
+plutôt que de l'y laisser. Candidat à une issue sur `ghosteo`.
 
 **Détail relevé au passage, à nettoyer sans urgence** : l'en-tête
 `strict-transport-security` est émis **deux fois**, par nginx dans l'image et par Traefik.

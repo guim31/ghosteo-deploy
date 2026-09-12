@@ -283,7 +283,14 @@ de migration a été joué une fois de bout en bout, sans client.
 
 1. **Préviens le client** deux ou trois jours avant : « Votre logiciel sera indisponible
    le [jour] entre [heure] et [heure + 1 h] pour une migration vers un hébergement plus
-   robuste. Vos données sont conservées à l'identique. » Un soir ou un week-end.
+   robuste. Vos données sont conservées à l'identique. **Après la migration, rechargez la
+   page dans votre navigateur avant de vous reconnecter** : sans cela vous pourriez voir un
+   message « Session expirée ». » Un soir ou un week-end.
+
+   Ce dernier point n'est pas une précaution théorique : le 12/09/2026, un cabinet a signalé
+   « le site ne fonctionne plus » alors que tout était sain côté serveur. Il avait sa page de
+   connexion ouverte depuis avant la bascule, donc un jeton de sécurité périmé. Recharger la
+   page suffit ; en navigation privée cela fonctionnait déjà.
 2. Dis-moi le créneau. Je ne bascule **jamais** un client sans ce créneau.
 
 ### Pendant (moi, tu peux regarder)
