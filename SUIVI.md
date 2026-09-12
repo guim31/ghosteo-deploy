@@ -751,6 +751,20 @@ Les métriques ne s'afficheront donc qu'après la bascule du back-office (phase 
 `servers.metrics_host` reste vide et l'écran le dit explicitement, plutôt que d'échouer
 toutes les minutes. Valeurs à saisir le jour J : `172.31.40.2` et `172.31.40.3`.
 
+### Reste à faire pour activer la refonte du moniteur
+
+1. **Guilhem déploie ghosteo.eu depuis Vito**, comme d'habitude (PR #63 fusionnée le
+   12/09/2026 à 17h47). Le déploiement par l'agent est refusé par son contrôle
+   d'autorisations, et c'est cohérent : c'est un `git reset --hard` suivi d'un build et de
+   migrations sur le serveur de licences dont dépendent toutes les instances.
+2. L'agent saisit ensuite le réglage `metrics_agent_token` (jeton dans
+   `~/.config/dokploy/metrics.token` du Beelink).
+3. `servers.metrics_host` : **à laisser vide jusqu'à la phase 6**, ghosteo.eu étant hors du
+   réseau privé. Valeurs du jour J : control-01 → `172.31.40.2`, worker-01 → `172.31.40.3`.
+
+Sans ces réglages, la pagination et la version déployée fonctionnent dès le déploiement ;
+seuls les blocs de métriques restent muets, en le disant.
+
 ### Le point de transport
 
 **VPC créé** le 12/09/2026 (`ghosteo`, `e4df5e22-69dc-4b9e-9567-b00c800da084`) après ajout de
