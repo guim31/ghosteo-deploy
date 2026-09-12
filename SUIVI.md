@@ -717,6 +717,40 @@ et aucune dépendance à une API jeune.
   *Piège du banc* : PHPStan meurt en « 4 errors » trompeuses si la mémoire PHP reste à 256 Mo.
   Lancer avec `--memory-limit=1G`.
 
+### Réseau privé en place (12/09/2026)
+
+Après ajout de `PrivateNetworksFullAccess` par Guilhem : VPC `ghosteo`
+(`e4df5e22-69dc-4b9e-9567-b00c800da084`), réseau privé **`ghosteo-interne`**
+(`1ad7d2d4-be8b-4395-82b6-26681b3a0bf2`, sous-réseau `172.31.40.0/22`).
+
+| Serveur | Adresse privée |
+|---|---|
+| control-01 | `172.31.40.2` |
+| worker-01 | `172.31.40.3` |
+
+Vérifié : les métriques des deux serveurs se lisent par le réseau privé, et le port 4500
+**reste fermé depuis l'extérieur**. Le relevé ne traverse donc jamais l'Internet public,
+ce qui importe puisque l'agent ne parle que HTTP.
+
+**Trois pièges rencontrés, tous consignés dans les scripts** :
+
+1. Le chemin d'API est `/servers/<id>/private_nics`. `/private_nics` seul renvoie 404.
+2. La carte privée monte mais **reste sans adresse** : il faut un fichier netplan qui
+   demande le bail DHCP. Deux dérogations y sont indispensables, `use-routes: false` et
+   `use-dns: false` — sans elles le réseau privé installerait une route par défaut et
+   remplacerait la résolution DNS du serveur. Même erreur que le tunnel VPN du travail.
+   Appliqué avec un filet de sécurité (retour arrière automatique à 180 s si l'accès SSH
+   se perdait) ; la route par défaut et le DNS sont restés intacts, vérifié.
+3. **`ufw` bloquait le port 4500**, y compris sur le réseau privé. Règle ajoutée sur les
+   deux serveurs, restreinte à `172.31.40.0/22`, et reportée dans `cloud-init/worker.yaml`
+   pour les prochains. `create-server.py` reçoit `--reseau-prive <id>` et imprime le
+   fichier netplan prêt à coller, adresse MAC comprise.
+
+**Limite à connaître** : ghosteo.eu tourne encore sur le VPS OVH, hors de ce réseau privé.
+Les métriques ne s'afficheront donc qu'après la bascule du back-office (phase 6). D'ici là
+`servers.metrics_host` reste vide et l'écran le dit explicitement, plutôt que d'échouer
+toutes les minutes. Valeurs à saisir le jour J : `172.31.40.2` et `172.31.40.3`.
+
 ### Le point de transport
 
 **VPC créé** le 12/09/2026 (`ghosteo`, `e4df5e22-69dc-4b9e-9567-b00c800da084`) après ajout de

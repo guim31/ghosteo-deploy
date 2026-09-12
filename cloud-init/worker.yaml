@@ -18,7 +18,8 @@
 #   - fuseau Europe/Paris, 2 Go de swap (la machine n'en a pas par défaut)
 #   - mises à jour de sécurité automatiques, sans redémarrage automatique
 #   - fail2ban sur SSH
-#   - ufw : 22, 80, 443 ouverts, tout le reste refusé pour les services de l'hôte.
+#   - ufw : 22, 80, 443 ouverts, 4500 (métriques) réservé au réseau privé, tout le
+#     reste refusé pour les services de l'hôte.
 #     Rappel : ufw ne gouverne PAS les ports publiés par Docker ; c'est le groupe de
 #     sécurité Scaleway (create-server.py) qui restreint le port 22 aux adresses du
 #     panneau et de la maison.
@@ -88,6 +89,11 @@ runcmd:
   - ufw allow 80/tcp
   - ufw allow 443/tcp
   - ufw allow 443/udp
+  # Agent de métriques : joignable UNIQUEMENT depuis le réseau privé Scaleway.
+  # Il ne parle que HTTP, son jeton n'a donc aucune raison de traverser l'Internet
+  # public. La carte privée est posée par create-server.py ; sans elle cette règle
+  # ne laisse rien passer, ce qui est le bon défaut.
+  - ufw allow from 172.31.40.0/22 to any port 4500 proto tcp comment 'agent de metriques, reseau prive uniquement'
   - ufw --force enable
   - touch /var/lib/cloud/ghosteo-worker-ready
 
