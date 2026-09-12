@@ -415,7 +415,7 @@ après cette date. Les cinq autres cabinets sont en métropole, créneau de soir
 | Guilhem HENRY | 12/09 08h29 | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
 | Xavier PAGES | | | | |
 | Cédric ROUSSEAU | | | | |
-| Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | 12/09 09h06 Paris = 03h06 chez lui | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
+| Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | 12/09 09h06 Paris = 03h06 chez lui | **12/09/2026**, coupure 3 min 30 | prévenu par message le 12/09, réponse attendue à son réveil | après le 12/10/2026 |
 | Alexia GAUTHIER | | | | |
 | Adrien BLACHON | | | | |
 | Anaïs DELAUNAY *(Nouvelle-Calédonie, 13h-20h heure de Paris)* | | | | |
@@ -582,12 +582,16 @@ processus du worker. Or la conversion passait alors ses secrets **en ligne de co
 **Corrigé** : les secrets passent par un fichier `--env-file` en mode 600, effacé au `shred`
 après usage. Vérifié : plus aucun secret dans les lignes de commande générées.
 
-**Décision à prendre par Guilhem** : faire tourner la clé d'`anais-delaunay`, ou l'accepter.
-La rotation n'est pas triviale et **aucune commande ne l'implémente** dans `ghosteo`. La voie
-propre existe pourtant : Laravel sait déchiffrer avec `APP_PREVIOUS_KEYS` pendant qu'on
-réenregistre les données avec la nouvelle clé. Cela demande une commande artisan à écrire
-(parcourir tous les modèles à champs `encrypted` et les resauvegarder), donc une issue et une
-PR sur `ghosteo`. Non bloquant pour les migrations en cours.
+**Décision de Guilhem, 12/09/2026 : risque accepté, pas de rotation.** La clé d'
+`anais-delaunay` reste en place. Le raisonnement : la conversation est privée, et la clé seule
+ne donne pas accès aux dossiers, il faudrait aussi la base.
+
+Pour mémoire si la question se rouvrait un jour : la rotation est possible mais **aucune
+commande ne l'implémente** dans `ghosteo`. La voie propre est `APP_PREVIOUS_KEYS` de Laravel,
+qui déchiffre avec l'ancienne clé pendant qu'on réenregistre les données avec la nouvelle ;
+il faudrait une commande artisan parcourant tous les modèles à champs `encrypted`. Les champs
+concernés sur `Patient` : nom, nom d'usage, prénom, adresse, téléphones, e-mail, numéro de
+sécurité sociale.
 
 ## Phase 6 — Fin
 
