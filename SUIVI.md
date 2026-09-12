@@ -418,7 +418,7 @@ après cette date. Les cinq autres cabinets sont en métropole, créneau de soir
 | Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | 12/09 09h06 Paris = 03h06 chez lui | **12/09/2026**, coupure 3 min 30 | prévenu par message le 12/09, réponse attendue à son réveil | après le 12/10/2026 |
 | Alexia GAUTHIER | | | | |
 | Adrien BLACHON | | | | |
-| Anaïs DELAUNAY *(Nouvelle-Calédonie, 13h-20h heure de Paris)* | | | | |
+| Anaïs DELAUNAY *(Nouvelle-Calédonie, 13h-20h heure de Paris)* | 12/09 14h07 Paris = 00h07 chez elle | **12/09/2026**, coupure 8 min | à faire | après le 12/10/2026 |
 
 ### Cabinet de Guilhem migré le 12/09/2026 — première migration réelle
 
@@ -592,6 +592,23 @@ qui déchiffre avec l'ancienne clé pendant qu'on réenregistre les données ave
 il faudrait une commande artisan parcourant tous les modèles à champs `encrypted`. Les champs
 concernés sur `Patient` : nom, nom d'usage, prénom, adresse, téléphones, e-mail, numéro de
 sécurité sociale.
+
+### Cabinet d'Anaïs DELAUNAY migré le 12/09/2026 (Nouvelle-Calédonie)
+
+**Première bascule entièrement automatique**, lancée par la crontab à 14h07 heure de Paris,
+soit 00h07 chez elle. Terminée à 14h15 : maintenance, sauvegarde à froid, conversion, contrôle
+de conformité (« copie conforme à la source »), installation, bascule d'adresse, certificat,
+vérification, rattachement au back-office, puis retrait de sa propre ligne de crontab.
+Instance #9 sur worker-01, service `ghosteo-anais-delaunay-x74jan`, certificat jusqu'au
+11/12/2026. Aucune intervention humaine.
+
+| | patients | consultations | comptabilités | comptes | fichiers patients |
+|---|---|---|---|---|---|
+| Ancienne (MySQL) | 6 204 | 17 290 | 17 290 | 3 | 178 |
+| Nouvelle (SQLite) | 6 204 | 17 290 | 17 290 | 3 | 178 |
+
+Déchiffrement vérifié, `hardware_id` conservé, licence `active` sans mode dégradé, aucune
+migration en attente. Worker-01 : 8 instances, 1 827 Mo de RAM sur 3 909, disque à 39 %.
 
 ### Aurélien signale que son site ne fonctionne plus (12/09/2026, ~13h30)
 
