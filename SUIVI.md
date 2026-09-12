@@ -412,7 +412,44 @@ après cette date. Les cinq autres cabinets sont en métropole, créneau de soir
 
 | Client | Créneau | Migré le | Vérifié par le client | Ancienne instance éteinte le |
 |---|---|---|---|---|
-| (cabinet de Guilhem) | | | | |
+| Guilhem HENRY | 12/09 08h29 | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
+| Xavier PAGES | | | | |
+| Cédric ROUSSEAU | | | | |
+| Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | | | | |
+| Alexia GAUTHIER | | | | |
+| Adrien BLACHON | | | | |
+| Anaïs DELAUNAY *(Nouvelle-Calédonie, 13h-20h heure de Paris)* | | | | |
+
+### Cabinet de Guilhem migré le 12/09/2026 — première migration réelle
+
+Instance #1, `guilhem-henry.ghosteoapp.eu`, sur worker-01 : service `a3fvfc_4BC2u4uUJ2Ww1t`
+(appName `ghosteo-guilhem-henry-17omke`), image **1.17.0**, certificat jusqu'au 11/12/2026.
+**Coupure de 3 min 30** (maintenance à 08h29, HTTPS rétabli à 08h32).
+
+Comparaison ancienne / nouvelle, identique sur toute la ligne :
+
+| | patients | consultations | comptabilités | comptes | fichiers patients |
+|---|---|---|---|---|---|
+| Ancienne (MySQL) | 5 075 | 19 863 | 19 944 | 7 | 40 |
+| Nouvelle (SQLite) | 5 075 | 19 863 | 19 944 | 7 | 40 |
+
+54 130 lignes copiées dans 30 tables. Déchiffrement vérifié sur un nom réel, `hardware_id`
+conservé (`6b966a2e…`), licence `GHOSTEO-YOPTEBPTN-MCYQP4RT` intacte, 22 documents patients et
+24 Mo restaurés, aucune migration en attente. Worker-01 : **2 instances sur 12**, 961 Mo de RAM
+utilisés sur 3 909. L'ancienne instance reste en maintenance sur le VPS, intacte, jusqu'au
+12/10/2026 au moins.
+
+**Deux défauts du script corrigés au passage, avant toute coupure** :
+
+1. **La conversion tournait sur control-01, qui ne peut pas tirer l'image privée.** Seul le
+   worker a des identifiants de registre (posés par Dokploy au test de registre) ; control-01
+   n'en a aucun et n'avait en cache que les images `essai-*`. Le répertoire de travail vit
+   désormais **sur le worker** : l'image y est, les données y arrivent de toute façon, et elles
+   ne transitent plus ni par le Beelink ni par le serveur de contrôle.
+2. **L'échec était masqué par un `| tail -2`** : le code de sortie d'un tube est celui de sa
+   dernière commande, donc `set -e` ne voyait rien et le script continuait avec une base vide.
+   Corrigé par `set -o pipefail`. Sans cette découverte, la bascule aurait installé une base
+   vide chez un client.
 
 ## Phase 6 — Fin
 

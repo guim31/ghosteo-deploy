@@ -89,6 +89,9 @@ def client(nom):
         if cle not in c:
             sortir(f"clients.yaml : « {cle} » manquant pour {nom}")
     c["nom"] = nom
+    # Le travail se fait SUR LE WORKER : seul lui peut tirer l'image privée (Dokploy y a
+    # posé les identifiants de registre ; control-01 n'en a pas). Les données de santé ne
+    # transitent donc ni par le Beelink ni par le serveur de contrôle.
     c["travail"] = f"/root/migration-{nom}"
     return c
 
@@ -148,8 +151,9 @@ def cmd_ttl(c):
 # ------------------------------------------------------------------- sauvegarde
 
 def sauvegarder(c, suffixe):
-    """Tire base, storage et .env de l'ancienne instance vers control-01."""
-    sh(CONTROL, f"mkdir -p {c['travail']} && chmod 700 {c['travail']}", silencieux=True)
+    """Tire base, storage et .env de l'ancienne instance vers le worker."""
+    hote = c["worker_ssh"]
+    sh(hote, f"mkdir -p {c['travail']} && chmod 700 {c['travail']}", silencieux=True)
     script = open(DUMP, encoding="utf-8").read()
     for mode, fichier in (("db", f"db-{suffixe}.sql.gz"),
                           ("storage", f"storage-{suffixe}.tar.gz"),
@@ -160,22 +164,22 @@ def sauvegarder(c, suffixe):
             ["ssh", VPS, f"bash -s -- {c['repertoire']} {mode}"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         aval = subprocess.Popen(
-            ["ssh", CONTROL, f"cat > {c['travail']}/{fichier}"], stdin=amont.stdout)
+            ["ssh", hote, f"cat > {c['travail']}/{fichier}"], stdin=amont.stdout)
         amont.stdin.write(script.encode())
         amont.stdin.close()
         amont.stdout.close()
         aval.communicate()
         if amont.wait() != 0 or aval.returncode != 0:
             sortir(f"sauvegarde « {mode} » en échec")
-        taille = sh(CONTROL, "stat -c %s " + c["travail"] + "/" + fichier, silencieux=True).strip()
+        taille = sh(hote, "stat -c %s " + c["travail"] + "/" + fichier, silencieux=True).strip()
         print(f"  {fichier} : {taille} octets")
-    sh(CONTROL, f"chmod 600 {c['travail']}/*", silencieux=True)
+    sh(hote, f"chmod 600 {c['travail']}/*", silencieux=True)
 
 
 def convertir(c, suffixe):
     """Charge le dump dans un MySQL jetable et le recopie en SQLite, clé d'origine conservée."""
     t = c["travail"]
-    script = f"""set -e
+    script = f"""set -euo pipefail
 docker rm -f conv-mysql >/dev/null 2>&1 || true
 docker network create conv-net >/dev/null 2>&1 || true
 openssl rand -hex 16 > {t}/.pw && chmod 600 {t}/.pw
@@ -205,14 +209,14 @@ docker rm -f conv-mysql >/dev/null 2>&1; docker network rm conv-net >/dev/null 2
 shred -u {t}/.pw 2>/dev/null || rm -f {t}/.pw
 chmod 600 {t}/database.sqlite
 """
-    sh(CONTROL, script)
+    sh(c["worker_ssh"], script)
 
 
 # ------------------------------------------------------------------ Dokploy
 
 def construire_env(c):
     """Le .env de l'ancienne instance, adapté au conteneur. La clé de chiffrement est conservée."""
-    ancien = sh(CONTROL, f"cat {c['travail']}/env-ancien", silencieux=True)
+    ancien = sh(c["worker_ssh"], f"cat {c['travail']}/env-ancien", silencieux=True)
     sortie, vues = [f"GHOSTEO_IMAGE={c['image']}"], set()
     for ligne in ancien.splitlines():
         s = ligne.strip()
@@ -310,24 +314,21 @@ def cmd_basculer(c):
     convertir(c, "froid")
 
     etape("Installation dans le volume de la nouvelle instance")
-    subprocess.run(["scp", "-q", f"{CONTROL}:{c['travail']}/database.sqlite",
-                    f"{CONTROL}:{c['travail']}/storage-froid.tar.gz", "/dev/shm/"], check=True)
-    subprocess.run(["scp", "-q", "/dev/shm/database.sqlite", "/dev/shm/storage-froid.tar.gz",
-                    f"{c['worker_ssh']}:/tmp/"], check=True)
-    os.remove("/dev/shm/database.sqlite"); os.remove("/dev/shm/storage-froid.tar.gz")
+    # Tout est déjà sur le worker : aucune copie ne passe par le Beelink.
     # Le volume est monté sur storage/, pas sur storage/app/ : extraire SANS strip-components,
     # sinon hardware_id atterrit au mauvais niveau et la licence repart sur une empreinte neuve.
-    sh(c["worker_ssh"], f"""set -e
+    sh(c["worker_ssh"], f"""set -euo pipefail
+T={c['travail']}
 V=$(docker volume inspect {app}_storage --format '{{{{.Mountpoint}}}}')
 U=$(docker exec {app}-web-1 stat -c '%u:%g' /var/www/html/storage/app/database.sqlite)
 docker stop {app}-web-1 {app}-scheduler-1 {app}-queue-1 >/dev/null
-cp /tmp/database.sqlite "$V/app/database.sqlite"
+cp "$T/database.sqlite" "$V/app/database.sqlite"
 rm -f "$V/app/database.sqlite-wal" "$V/app/database.sqlite-shm"
-tar xzf /tmp/storage-froid.tar.gz -C "$V"
+tar xzf "$T/storage-froid.tar.gz" -C "$V"
 chown -R "$U" "$V/app"
-rm -f /tmp/database.sqlite /tmp/storage-froid.tar.gz
 docker start {app}-web-1 {app}-scheduler-1 {app}-queue-1 >/dev/null
 test -f "$V/app/hardware_id" && echo "  hardware_id conservé" || echo "  ATTENTION : hardware_id absent"
+du -sh "$V/app" | sed 's/^/  volume : /'
 """)
     attendre_conteneur(c)
 
