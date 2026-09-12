@@ -666,6 +666,51 @@ plutôt que de l'y laisser. Candidat à une issue sur `ghosteo`.
 `strict-transport-security` est émis **deux fois**, par nginx dans l'image et par Traefik.
 Sans effet fonctionnel, mais à dédoublonner.
 
+## Refonte du moniteur d'instances (demandée le 12/09/2026)
+
+Quatre demandes de Guilhem : des métriques serveur utiles (Vito n'en remonte presque pas),
+surveiller les bons serveurs (le VPS Vito n'aura bientôt plus de sens), obtenir la version
+déployée sans attendre qu'un client se connecte, et raccourcir la liste de 100 lignes en bas
+de la fiche d'instance.
+
+### Ce qui existe aujourd'hui, et pourquoi ça casse
+
+- `HostMetricsReader` lit le `/proc` **de la machine qui exécute le back-office**. Cela marche
+  tant que ghosteo.eu est colocalisé avec les instances sur le VPS Vito. Dès la phase 6, il
+  rapportera les chiffres de control-01 et non ceux du worker : faux, pas seulement inutile.
+- `VersionService` déduit la version de chaque instance de ce que remonte le ping de licence,
+  et la version de référence est la plus élevée observée. D'où « 4/9 à jour » alors que les
+  instances migrées tournent en 1.17.0 : les autres n'ont pas encore pingé.
+- `InstanceController` charge `limit(100)` contrôles sans pagination (ligne 86).
+
+### Ce que l'agent de métriques Dokploy sait faire (mesuré)
+
+Activé sur les deux serveurs le 12/09/2026 (`admin.setupMonitoring` pour le panneau,
+`server.setupMonitoring` pour le worker). Conteneur `dokploy/monitoring:latest`, **24 Mo de
+mémoire**, écoute sur le port 4500, jeton dans `~/.config/dokploy/metrics.token` du Beelink.
+
+Données renvoyées par `/metrics`, bien plus riches que Vito : `cpu` %, modèle et nombre de
+cœurs, fréquence, OS, noyau, architecture, `memUsed` en % **et en Go**, `memTotal`,
+`diskUsed` %, `totalDisk`, `networkIn`/`networkOut`, `uptime`. `/metrics/containers` existe
+aussi, pour un suivi par instance.
+
+**Deux pièges relevés** : l'image est en `:latest`, non épinglée, contrairement à la règle
+posée pour Dokploy lui-même. Et la route `server.getServerMetrics` de l'API Dokploy **ne
+fonctionne pas** (« fetch failed ») : le conteneur Dokploy n'atteint pas l'agent qui écoute
+sur l'hôte. Lire l'agent directement est de toute façon préférable — un appel HTTP de moins
+et aucune dépendance à une API jeune.
+
+### Le point de transport, à trancher
+
+Le port 4500 du worker **n'est pas joignable depuis le panneau** (groupe de sécurité : 22, 80,
+443 seulement). Vérifié. Trois voies :
+
+| Voie | Avantage | Inconvénient |
+|---|---|---|
+| Réseau privé Scaleway (VPC) | le plus propre, gratuit, rien d'exposé | la clé du Beelink **n'a pas le droit VPC** ; demande une permission et un rattachement des deux machines |
+| Publier l'agent en HTTPS derrière Traefik | chiffré, aucune règle de pare-feu à ajouter | crée une adresse publique de plus, protégée par le seul jeton |
+| Ouvrir 4500 à la seule IP du back-office | simple | **jeton en clair sur Internet**, l'agent ne fait que du HTTP |
+
 ## Phase 6 — Fin
 
 - [ ] ghosteo.eu basculé
