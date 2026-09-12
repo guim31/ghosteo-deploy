@@ -751,19 +751,36 @@ Les métriques ne s'afficheront donc qu'après la bascule du back-office (phase 
 `servers.metrics_host` reste vide et l'écran le dit explicitement, plutôt que d'échouer
 toutes les minutes. Valeurs à saisir le jour J : `172.31.40.2` et `172.31.40.3`.
 
-### Reste à faire pour activer la refonte du moniteur
+### Refonte du moniteur en service (12/09/2026)
 
-1. **Guilhem déploie ghosteo.eu depuis Vito**, comme d'habitude (PR #63 fusionnée le
-   12/09/2026 à 17h47). Le déploiement par l'agent est refusé par son contrôle
-   d'autorisations, et c'est cohérent : c'est un `git reset --hard` suivi d'un build et de
-   migrations sur le serveur de licences dont dépendent toutes les instances.
-2. L'agent saisit ensuite le réglage `metrics_agent_token` (jeton dans
-   `~/.config/dokploy/metrics.token` du Beelink).
-3. `servers.metrics_host` : **à laisser vide jusqu'à la phase 6**, ghosteo.eu étant hors du
-   réseau privé. Valeurs du jour J : control-01 → `172.31.40.2`, worker-01 → `172.31.40.3`.
+PR #63 fusionnée à 17h47 et **déployée par Guilhem depuis Vito** — le déploiement par
+l'agent est refusé par son contrôle d'autorisations, et c'est cohérent : c'est un
+`git reset --hard` suivi d'un build et de migrations sur le serveur de licences dont
+dépendent toutes les instances. Les quatre colonnes sont en place, le réglage
+`metrics_agent_token` est saisi et chiffré en base (copies temporaires effacées des deux
+machines).
 
-Sans ces réglages, la pagination et la version déployée fonctionnent dès le déploiement ;
-seuls les blocs de métriques restent muets, en le disant.
+Premier relevé, qui valide la fonctionnalité **et trouve deux choses** :
+
+| Instance | Image déployée | Version annoncée |
+|---|---|---|
+| Guilhem HENRY | 1.17.0 | 1.17.0 |
+| Demo DEMO | 1.17.0 | **1.16.0** |
+| Aurélien MARIE-JOSEPH | 1.17.0 | 1.17.0 |
+| Anaïs DELAUNAY | 1.17.0 | 1.17.0 |
+| Staging SCALEWAY | **essai-2** | 1.16.0 |
+
+- La démo affiche l'écart attendu : elle est bien en 1.17.0 mais personne ne s'y est
+  connecté depuis, donc son ping de licence annonce encore l'ancienne. C'est exactement le
+  cas que la colonne sait désormais distinguer, et qui restait invisible avant.
+- **La recette tournait encore sur `essai-2`**, image d'essai antérieure au correctif des
+  index SQLite. Passée en 1.17.0 le 12/09/2026. Sans la version déployée, ce retard était
+  indétectable : son ping annonçait 1.16.0 comme trois autres instances.
+
+Référence du parc : 1.17.0. À jour : 5 / 9. Écarts image/annonce : 1.
+
+`servers.metrics_host` reste **vide jusqu'à la phase 6**, ghosteo.eu étant hors du réseau
+privé. Valeurs du jour J : control-01 → `172.31.40.2`, worker-01 → `172.31.40.3`.
 
 ### Le point de transport
 
