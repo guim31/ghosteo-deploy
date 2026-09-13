@@ -896,8 +896,8 @@ automatique a fonctionné à chaque fois.
 ## Phase 6 — Fin
 
 - [x] **ghosteo.eu basculé sur control-01 le 13/09/2026** (voir le détail plus bas)
-- [ ] `servers.metrics_host` renseigné (`172.31.40.2`, `172.31.40.3`) : les métriques du
-      moniteur ne s'allument qu'une fois le back-office dans le réseau privé
+- [~] `servers.metrics_host` renseigné : **worker-01 fait (`172.31.40.3`)**, control-01 en
+      attente d'une règle de pare-feu (voir plus bas)
 - [ ] Sauvegarde finale de l'ancien serveur sur Object Storage
 - [ ] VPS OVH résilié
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
@@ -1228,6 +1228,73 @@ réussite sans qu'aucune instance n'ait parlé au nouveau serveur.*
 **Le TTL de `ghosteo.eu` et `www` reste à 60 s.** Sans inconvénient, mais à remonter à
 3 600 s une fois la bascule éprouvée quelques jours, pour épargner des requêtes aux
 résolveurs.
+
+#### Étape 3, métriques du moniteur — worker-01 allumé, control-01 en attente
+
+**worker-01 est renseigné et lit tout**, relevé du 13/09/2026 à 13h20 :
+
+| Mesure | Valeur |
+|---|---|
+| Processeur | 33 % sur 3 cœurs |
+| Mémoire | 49 %, soit 1,86 Go sur 3,82 |
+| Disque | 46 % sur 35 Go |
+| Système | Ubuntu 24.04.5, en route depuis 39 h |
+
+C'est le bloc qui compte : worker-01 porte les huit instances.
+
+**control-01 reste vide, et c'est délibéré.** Son propre agent de métriques est vivant
+(401 depuis l'hôte, donc il attend le jeton) mais **injoignable depuis le conteneur du
+back-office**. La cause est une conséquence directe de la bascule : la règle `ufw` posée en
+phase 4 n'autorise le port 4500 que depuis `172.31.40.0/22`, le réseau privé. Or le
+back-office ne tourne plus sur la machine, il tourne **dans un conteneur de** la machine, et
+ses requêtes sortent avec une adresse du pont Docker (`172.19.0.3`). Elles arrivent sur
+l'hôte, donc dans la chaîne filtrée par `ufw`, et sont refusées.
+
+Trois autres chemins ont été essayés depuis le conteneur, aucun ne passe : l'adresse du
+conteneur de l'agent (`172.17.0.2`), la passerelle du pont par défaut (`172.17.0.1`) et
+celle du réseau Dokploy. L'agent tourne sur le pont **par défaut**, le back-office sur son
+réseau de composition et sur `dokploy-network` : aucun réseau commun, et Docker isole les
+ponts entre eux.
+
+**Le correctif tient en une ligne, mais le garde-fou de l'agent refuse de modifier un
+pare-feu de production, ce qui est sain.** À lancer par Guilhem :
+
+```
+ssh control-01 "ufw allow from 172.16.0.0/12 to any port 4500 proto tcp comment 'agent de metriques, conteneurs locaux'"
+```
+
+Ce que cela ouvre : les conteneurs **de cette machine** peuvent interroger l'agent, et il
+leur faut toujours le jeton. `172.16.0.0/12` est l'espace privé où Docker taille ses ponts ;
+rien n'y est joignable depuis Internet. Ensuite, côté back-office, poser
+`metrics_host = 172.31.40.2` sur le serveur #1.
+
+L'hôte est laissé **vide** en attendant plutôt que renseigné : un hôte injoignable ferait
+échouer le relevé toutes les minutes et remplirait le journal, alors que vide, l'écran
+affiche explicitement « aucune adresse renseignée ».
+
+#### Piège à retardement trouvé au passage : Docker va manquer de sous-réseaux
+
+Docker taille ses réseaux dans `172.17.0.0/12`, par `/16` successifs. Sur **worker-01** :
+`bridge` 172.17, `docker_gwbridge` 172.18, puis **un `/16` par instance** — les huit
+cabinets occupent 172.19 à 172.26.
+
+Or le réseau privé Scaleway, qui porte les métriques, est en **`172.31.40.0/22`**.
+
+| Instances sur worker-01 | Dernier `/16` attribué |
+|---|---|
+| 8 (aujourd'hui) | 172.26 |
+| 12 (le plafond déclaré) | 172.30 |
+| **13** | **172.31 — collision avec le réseau privé** |
+
+Le plafond de 12 protège donc d'un cheveu. Le jour où il serait relevé, ou si un réseau
+supplémentaire apparaît, Docker attribuerait `172.31.0.0/16` et le relevé de métriques
+tomberait — avec une cause très difficile à deviner.
+
+**Correctif, à appliquer hors de cette phase** : poser `default-address-pool` dans
+`/etc/docker/daemon.json` (par exemple base `172.20.0.0/14`, taille 24, ce qui donne mille
+réseaux sans jamais toucher `172.31.x`) et l'ajouter aux deux `cloud-init/`. Sur les
+machines existantes, cela demande un redémarrage du démon Docker — donc une courte coupure
+des sept cabinets sur worker-01, à planifier. Les réseaux déjà attribués ne bougent pas.
 
 ## Notes
 
