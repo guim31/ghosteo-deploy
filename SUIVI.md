@@ -929,6 +929,118 @@ veille, domaine déclaré **après** la bascule, marge de 90 s).
 - L'en-tête `strict-transport-security` est émis deux fois, par nginx et par Traefik.
 - Les sept cabinets doivent confirmer, chacun, qu'ils se connectent normalement.
 
+### Plan de bascule de ghosteo.eu, proposé et accepté le 13/09/2026
+
+**Ce que ghosteo.eu est réellement sur le VPS** (relevé du 13/09) : une application Laravel
+distincte des instances, sous l'utilisateur `ghosteoserver`, servie pour `ghosteo.eu` **et**
+`www.ghosteo.eu`. Base **MySQL 8.4** `ghosteoserver_db`, **7,7 Mo**, 30 tables : sessions,
+cache et file d'attente y sont aussi (`SESSION_DRIVER`, `CACHE_STORE`, `QUEUE_CONNECTION`
+= `database`). `storage/app` pèse **32 Mo** : images des publications sociales, deux fichiers
+Scribe et — important — les **deux clés des licences hors-ligne**
+(`private/offline_private.key`, `offline_public.key`). Un cron `schedule:run` chaque minute
+(`deployments:advance`, `instances:check`, publication sociale, expiration des abonnements),
+un worker `queue:work` sous supervisor. Courrier par l'API Mailgun (HTTPS, donc insensible au
+blocage SMTP de Scaleway). Stripe envoie ses webhooks à `ghosteo.eu` : ils suivront le DNS
+et Stripe réessaie de lui-même en cas de 503. Pas de relais Gemini configuré.
+
+**DNS** : la zone `ghosteo.eu` reste chez OVH (elle porte le courrier). `@` et `www` sont des
+A vers `51.178.87.41` avec un **TTL de 3 600 s**, et **il existe un AAAA** vers l'IPv6 du VPS
+(`2001:41d0:404:200::9036`). control-01 n'a pas d'IPv6 publique : cet AAAA doit être
+**supprimé** avant la bascule, sinon les visiteurs en IPv6 resteraient sur l'ancien serveur.
+`panel.ghosteo.eu` pointe déjà vers control-01. Aucun changement de serveurs de noms, donc
+DNSSEC n'entre pas en jeu.
+
+**Les instances** : les 8 `.env` de worker-01 portent `LICENSE_SERVER_URL=https://ghosteo.eu`.
+L'instance appelle `POST /api/v1/licenses/verify` quand son cache expire (12 h si la licence
+est active, 5 min sinon) ; le serveur inscrit `licenses.last_verified_at`. C'est la preuve à
+lire après bascule, et l'on peut forcer la revalidation en vidant le cache de chaque instance.
+
+**Place sur control-01** : 2,2 Go disponibles sur 3,9, disque à 40 %, l'image `mysql:8.4`
+déjà en cache. Le back-office (~150 Mo) et sa base (~300 Mo) tiennent.
+
+#### Le plan, en cinq temps
+
+| # | Quoi | Qui | Coupure |
+|---|---|---|---|
+| A | **Image Docker du back-office** : `Dockerfile` calqué sur celui de `ghosteo` (PHP 8.3, nginx + php-fpm, trois rôles web/scheduler/queue), workflow qui construit à chaque fusion sur `main` et publie `ghcr.io/guim31/ghosteoeu-main:<sha>` en privé, et `trustProxies` dans `bootstrap/app.php` (absent aujourd'hui : derrière Traefik, sans lui, tout serait généré en `http://` — le bug déjà corrigé sur `ghosteo` par la PR 194). PR à fusionner par Guilhem, qui remet temporairement la permission « Workflows » sur son jeton, puis la retire. | moi, puis Guilhem | aucune |
+| B | **Répétition à blanc sur control-01** : service MySQL 8.4 créé par Dokploy (`mysql.create`), service compose `backoffice` depuis l'image, restauration de la sauvegarde nocturne chiffrée (déchiffrée sur control-01, jamais sur le Beelink), copie de `storage/app`, `.env` adapté (`DB_HOST` = le conteneur MySQL, `TRUSTED_PROXIES=*`, journaux sur stderr, `APP_KEY` **inchangée** : elle chiffre les jetons Dokploy, DNS et métriques et les `.env` des déploiements). Vérification en visant l'adresse (`curl --resolve`), pas de domaine déclaré. | moi | aucune |
+| C | **La veille** : chez OVH, TTL de `ghosteo.eu` et `www.ghosteo.eu` à 60 s, suppression de l'AAAA. | Guilhem | aucune |
+| D | **La bascule, un soir, ~10 min ensemble** : maintenance sur le VPS → dump à froid → restauration → copie finale de `storage/app` → **Guilhem change les deux A vers `51.158.96.49`** → 90 s → domaines `ghosteo.eu` et `www` déclarés dans Dokploy (jamais avant, leçon de la phase 5) → certificat → contrôles par `--resolve`. Retour arrière : remettre les deux A, sortir le VPS de maintenance. | ensemble | 5 à 10 min, invisible des instances (cache 12 h) |
+| E | **Licences** : revalidation forcée des 8 instances (cache vidé, une requête), lecture de `last_verified_at` dans la base du back-office, puis moniteur : les blocs de métriques s'allument en renseignant `172.31.40.2` / `172.31.40.3`. | moi | aucune |
+
+**Pourquoi MySQL et pas SQLite ici** : la base est minuscule, le dump se restaure en quelques
+secondes sans conversion, et Dokploy sait planifier ses sauvegardes vers un stockage S3.
+Le choix SQLite valait pour multiplier des instances ; il n'y en a qu'une.
+
+**Pourquoi une image construite par GitHub et pas un build sur control-01** : même geste que
+pour les instances (mettre à jour = changer le tag), aucune compilation sur le serveur de
+contrôle, et le dépôt reste privé. Coût : ~5 min d'Actions par fusion sur `main`.
+
+**Ce qui reste à concevoir** (rien n'existe encore) : le `Dockerfile` et le workflow du
+back-office, le gabarit compose `compose/backoffice.yml`, et un petit outil
+`migrate-backoffice.py` (sauvegarder / restaurer / maintenance / vérifier / retour-arrière)
+qui reprend les briques de `migrate-instance.py` sans sa partie SQLite.
+
+**Préalable à l'extinction du VPS, découvert en préparant** : les 8 instances de worker-01
+n'ont **aucune sauvegarde**. La sauvegarde nocturne (`backup-vps.sh`) ne connaît que le VPS,
+dont les copies sont figées depuis les bascules. Tant que le VPS existe il reste une copie
+d'il y a quelques jours ; **une fois éteint, les dossiers patients n'existeraient qu'à un
+seul endroit**. Une sauvegarde nocturne de worker-01 (volumes SQLite + documents) et de la
+base du back-office sur control-01 doit exister **avant** de résilier. À inscrire dans
+l'étape 4.
+
+**Secrets brûlés à ce jour, pour l'étape 5** : clé Scaleway `beelink-migration`, jeton API
+Dokploy, jeton de l'agent de métriques, clé Scaleway `backoffice-dns` (posée par tinker),
+et — depuis ce matin — le **secret de webhook Stripe** du back-office, affiché par erreur en
+lisant le `.env` du VPS (à régénérer dans le tableau de bord Stripe, puis à saisir dans les
+variables du service). La clé d'`anais-delaunay` reste un risque accepté (12/09).
+
+**Dates** : renouvellement du VPS OVH le **23/09/2026**, à prendre **sans engagement** ;
+les anciennes instances sont à conserver jusqu'au **13/10/2026** (30 jours après la dernière
+bascule). La résiliation ne devrait donc pas précéder le 13/10.
+
+#### Étape A faite le 13/09/2026 : l'image du back-office — PR https://github.com/guim31/ghosteoeu-main/pull/64
+
+`Dockerfile` multi-étapes calqué sur celui de `ghosteo` (assets Vite en Node 22 comme la CI
+de ce dépôt, dépendances Composer, image finale `serversideup/php:8.3-fpm-nginx`),
+`.dockerignore`, entrée `docker/entrypoint.d/`, workflow `docker.yml` et `trustProxies`.
+
+**Le workflow diffère de celui de `ghosteo` sur un point** : ce dépôt n'a pas de versions
+taguées, sa livraison est la fusion d'une PR dans `main`. C'est donc la fusion qui construit
+l'image, avec deux tags — `main-<sha court>` pour désigner un commit précis (le retour
+arrière) et `latest`. Le piège du tag posé par le `GITHUB_TOKEN` (12/09) ne se pose pas ici.
+
+Contrôles avant d'ouvrir la PR, sur le banc du NAS : Pint 292 fichiers, PHPStan sans erreur,
+**423 tests**. Image construite (**841 Mo**) et démarrée contre un MySQL 8.4 jetable :
+migrations jouées, `/up`, `/login` et `/mentions-legales` à 200, assets Vite servis, lien
+`public/storage` posé, `gd` **avec FreeType** (le titre des visuels sociaux est réellement
+dessiné avec la police Outfit — testé, pas seulement listé), `intl`, `bcmath`, `pdo_mysql`
+présents, et **les trois rôles démarrent depuis la même image**, le planificateur exécutant
+bien `deployments:advance` à la minute.
+
+**Trois choses apprises en construisant, qui valent pour les deux dépôts :**
+
+1. **`bootstrap/cache/*` doit être exclu de l'image.** Un build lancé depuis un poste de
+   travail y trouve les fournisseurs de développement déjà découverts (Laravel Pail),
+   absents de l'image construite sans les dépendances de développement : `package:discover`
+   s'arrête sur une classe introuvable et le build échoue. La CI part d'un dépôt propre et
+   ne le voit jamais. *Le `.dockerignore` de `ghosteo` a le même trou* — sans conséquence
+   tant que ses images sont construites par GitHub, à corriger à l'occasion.
+2. **`trustProxies` manquait bel et bien**, et la preuve est nette : avec l'en-tête de proxy,
+   les 16 URL de la page de connexion sortent en `https` ; sans lui, en `http`. Déployer
+   sans ce correctif aurait donné un site sans feuille de style, comme le staging en phase 2.
+3. **Le conteneur n'attend la base que 30 secondes** au démarrage (comportement de
+   `serversideup/php`). Si la base démarre en même temps que lui — cas d'un premier
+   déploiement — il s'arrête avant qu'elle soit prête. Le `restart: unless-stopped` le
+   rattrape, mais le gabarit compose pose en plus une condition d'état de santé.
+
+Le jeton GitHub ne peut pas lire l'état des vérifications d'une PR (403, permission
+« Checks » non accordée, cohérent avec le périmètre choisi) : la CI se regarde sur la page
+de la PR. La réplique locale du NAS est identique à `tests.yml` et elle est verte.
+
+**Reste à faire par Guilhem pour clore l'étape A** : fusionner la PR #64 — la fusion
+construit et publie l'image toute seule — puis retirer la permission « Workflows » du jeton.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
