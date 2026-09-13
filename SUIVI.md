@@ -846,8 +846,27 @@ n'est pas redémarré, mais à savoir.
   les non tentés. Enchaîner malgré un échec a coûté trois cabinets au lieu d'un, la cause étant
   commune et chaque tentative l'aggravant.
 
-**Reprise programmée le 13/09 à 00h35**, soit plus d'une heure après le dernier échec (23h25),
-le temps que le quota se libère. Les trois cabinets, un à la fois, arrêt au premier échec.
+**La reprise de 00h35 a échoué avant d'avoir rien touché** — et pour une tout autre raison :
+`Temporary failure in name resolution` **sur le Beelink**. Le script n'a pas pu joindre les API
+Scaleway et Dokploy, s'est arrêté à sa première instruction, et le retour arrière a échoué de
+la même façon. Aucun client n'a bougé : la mise en maintenance n'avait pas eu lieu. Le résumé
+« RETOUR ARRIÈRE EN ÉCHEC » est donc alarmiste à tort — vérifié, les quatre cabinets
+répondaient en 200.
+
+**Deuxième panne de résolution DNS du Beelink dans la journée** (la première vers 17h40, sur
+un appel à l'API Scaleway). Le Beelink résout via la passerelle UniFi (192.168.100.1), pas
+directement par AdGuard. Dix essais consécutifs réussissent ce matin : la panne est
+intermittente. **À diagnostiquer séparément** : c'est le résolveur de toute la maison.
+
+**Correctif apporté le 13/09/2026** : `scw.py` et `dokploy.py` rejouent un appel quand la
+couche transport lâche (jusqu'à quatre tentatives, délai croissant), mais **jamais sur une
+erreur HTTP** — une réponse du serveur doit remonter telle quelle. Une panne de résolution de
+quelques secondes n'interrompt plus une migration en plein créneau.
+
+**État au 13/09 08h15** : quota Let's Encrypt libéré depuis longtemps (dernière tentative ACME
+le 12/09 à 23h28), procédure corrigée et éprouvée, trois instances prêtes et leurs données
+déjà converties. Il ne manque qu'un créneau : les clients avaient été prévenus pour samedi
+21h, le choix du nouveau moment revient à Guilhem.
 
 ## Phase 6 — Fin
 
