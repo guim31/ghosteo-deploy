@@ -1,0 +1,97 @@
+# Gabarit du back-office GHosteo (ghosteo.eu) sur Dokploy, type « docker-compose »,
+# source « raw ». À déployer sur control-01, le serveur de contrôle.
+#
+# Quatre conteneurs : les trois rôles de l'application depuis la même image, et sa
+# base MySQL. Contrairement aux instances clientes, qui tiennent dans un fichier
+# SQLite, le back-office garde MySQL : sa base est minuscule (7,7 Mo), le dump de
+# l'ancien serveur s'y restaure tel quel sans conversion, et il n'y en a qu'une —
+# le choix SQLite servait à multiplier les instances, pas à en héberger une.
+#
+#   web        nginx + php-fpm, joue les migrations au démarrage, exposé par Traefik
+#   scheduler  php artisan schedule:work — fait AVANCER LES DÉPLOIEMENTS chaque minute
+#              (deployments:advance) et sonde les instances (instances:check)
+#   queue      php artisan queue:work — envois de courrier
+#   db         MySQL 8.4, la même version que sur l'ancien serveur
+#
+# Les variables viennent du fichier .env que Dokploy dépose à côté de ce fichier.
+# Quatre d'entre elles servent ici, les autres sont lues par Laravel :
+#   GHOSTEO_IMAGE      ex. ghcr.io/guim31/ghosteoeu-main:main-a1b2c3d
+#   DB_DATABASE, DB_USERNAME, DB_PASSWORD, DB_ROOT_PASSWORD
+#
+# Les domaines (ghosteo.eu ET www.ghosteo.eu) se déclarent dans Dokploy, sur le
+# service « web », port 8080 — et seulement APRÈS la bascule des adresses, sans
+# quoi Let's Encrypt refuse le nom pendant une heure (phase 5, 12/09/2026).
+#
+# ⚠ Le volume « db » porte la base. « compose.delete » supprime les volumes :
+# ne jamais supprimer ce service pour le recréer sans avoir restauré une
+# sauvegarde au préalable. Un « compose.redeploy », lui, ne touche pas aux volumes.
+
+services:
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    # control-01 est un DEV1-M : la base tient en mémoire sans réserver 128 Mo
+    # par défaut pour une base de 8 Mo, et le schéma de performances ne sert à rien.
+    command: ["--innodb-buffer-pool-size=128M", "--performance-schema=OFF"]
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - db:/var/lib/mysql
+    healthcheck:
+      # Le mot de passe passe par l'environnement du processus, jamais en argument :
+      # un argument serait visible dans « ps » sur la machine hôte. Même précaution
+      # que pour la conversion des instances (incident du 12/09/2026).
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping --protocol=TCP -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
+  web:
+    image: ${GHOSTEO_IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - storage:/var/www/html/storage
+    stop_grace_period: 30s
+    # L'image n'attend la base que 30 secondes avant d'abandonner. Au tout premier
+    # déploiement, MySQL met plus longtemps à s'initialiser : sans cette condition,
+    # le conteneur meurt puis redémarre en boucle jusqu'à ce que la base soit prête.
+    depends_on:
+      db:
+        condition: service_healthy
+
+  scheduler:
+    image: ${GHOSTEO_IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AUTORUN_ENABLED: "false"
+    command: ["php", "/var/www/html/artisan", "schedule:work"]
+    volumes:
+      - storage:/var/www/html/storage
+    healthcheck:
+      disable: true
+    depends_on:
+      - web
+
+  queue:
+    image: ${GHOSTEO_IMAGE}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      AUTORUN_ENABLED: "false"
+    command: ["php", "/var/www/html/artisan", "queue:work", "--tries=3", "--sleep=3", "--max-time=3600"]
+    volumes:
+      - storage:/var/www/html/storage
+    healthcheck:
+      disable: true
+    depends_on:
+      - web
+
+volumes:
+  storage:
+  db:

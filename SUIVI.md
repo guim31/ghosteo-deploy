@@ -1041,6 +1041,50 @@ de la PR. La réplique locale du NAS est identique à `tests.yml` et elle est ve
 **Reste à faire par Guilhem pour clore l'étape A** : fusionner la PR #64 — la fusion
 construit et publie l'image toute seule — puis retirer la permission « Workflows » du jeton.
 
+#### Étape B préparée le 13/09/2026 : le gabarit et l'outil de bascule
+
+`compose/backoffice.yml` et `scripts/migrate-backoffice.py`, écrits mais **pas encore
+lancés** : ils attendent que l'image existe, donc la fusion de la PR #64.
+
+**Le gabarit compose porte quatre conteneurs** et non trois : les rôles `web`, `scheduler`
+et `queue` depuis l'image, plus `db` en `mysql:8.4`, la version de l'ancien serveur. La
+base reste MySQL — 7,7 Mo, le dump se restaure tel quel sans conversion, et il n'y en a
+qu'une : le choix SQLite servait à multiplier les instances.
+
+**L'outil reprend les leçons de la phase 5** et en ajoute trois propres au back-office :
+
+1. **La zone `ghosteo.eu` est chez OVH, pas chez Scaleway.** Aucune API : la bascule
+   s'arrête et dicte à Guilhem les trois lignes à changer, puis la commande `dns` reprend.
+   Elle vérifie l'autorité OVH **et** trois résolveurs publics avant de déclarer quoi que
+   ce soit, attend 90 s, puis pose les domaines — jamais avant, leçon du quota ACME.
+2. **Deux planificateurs ne doivent jamais tourner ensemble.** Celui du back-office fait
+   avancer les déploiements et sonde les instances chaque minute. Pendant la répétition,
+   les conteneurs `scheduler` et `queue` de la copie sont donc **arrêtés** (`unless-stopped`
+   respecte un arrêt manuel) ; côté VPS, c'est le mode maintenance qui les endort — Laravel
+   n'exécute ni les tâches planifiées ni la file d'attente quand l'application est « down ».
+   C'est aussi ce qui fige les comptes entre la sauvegarde et le contrôle.
+3. **Le contrôle de conformité est souple à la répétition, strict à la bascule.**
+   `instance_checks` compte **55 734 lignes** et grossit toutes les cinq minutes : exiger
+   l'égalité sur une source en service ferait échouer la répétition à coup sûr. Les tables
+   du métier (`users`, `licenses`, `instances`, `settings`, `plans`, `servers`,
+   `subscriptions`, `site_deployments`…) doivent en revanche correspondre exactement, dans
+   les deux cas. Comptage de référence relevé sur le VPS le 13/09 : **30 tables,
+   59 562 lignes**, dont 11 comptes, 10 licences, 10 instances, 40 réglages.
+
+**Deux précautions reprises telles quelles** : les mots de passe ne passent jamais en
+argument — le shell **du conteneur** MySQL lit la variable que Docker y a déjà, donc rien
+n'apparaît dans un `ps` (incident du 12/09) — et l'identifiant du propriétaire des fichiers
+est **lu dans le conteneur** avant de l'arrêter, jamais supposé.
+
+**Le point le plus délicat, et la raison pour laquelle `APP_KEY` est conservée telle
+quelle** : elle ne chiffre pas des dossiers patients ici, mais les **réglages en base** —
+jeton de l'API Dokploy, jeton DNS Scaleway, jeton de l'agent de métriques — et les `.env`
+des déploiements. La changer rendrait le back-office incapable de piloter quoi que ce soit.
+
+**Ce que la bascule ne changera pas** : les huit instances portent
+`LICENSE_SERVER_URL=https://ghosteo.eu` et suivent donc le DNS sans aucune modification.
+Stripe et Mailgun aussi ; Stripe réémet ses webhooks en cas d'échec.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
