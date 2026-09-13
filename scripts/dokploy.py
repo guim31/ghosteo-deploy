@@ -13,12 +13,34 @@ Le résultat est imprimé en JSON ; un code HTTP hors 2xx sort en 1.
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
 CONF = os.path.expanduser("~/.config/dokploy")
 
+
+
+def _appel_resilient(req, timeout, essais=4):
+    """Rejoue un appel réseau quand la couche transport lâche, pas quand le serveur répond.
+
+    Le résolveur DNS de la maison tombe par intermittence (deux fois le 12/09/2026) : sans
+    cette reprise, une panne de résolution de trois secondes interrompt la migration d'un
+    cabinet en plein créneau. Une erreur HTTP, elle, n'est PAS rejouée : elle est une
+    réponse du serveur et doit remonter telle quelle à l'appelant.
+    """
+    dernier = None
+    for tentative in range(essais):
+        try:
+            return urllib.request.urlopen(req, timeout=timeout)
+        except urllib.error.HTTPError:
+            raise
+        except (urllib.error.URLError, OSError) as err:
+            dernier = err
+            if tentative < essais - 1:
+                time.sleep(2 * (tentative + 1))
+    raise dernier
 
 def call(method, route, body=None, query=None):
     token = open(os.path.join(CONF, "token")).read().strip()
@@ -30,7 +52,7 @@ def call(method, route, body=None, query=None):
     req = urllib.request.Request(url, data=data, method=method,
                                  headers={"x-api-key": token, "Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with _appel_resilient(req, 120) as resp:
             text = resp.read().decode()
             return resp.status, (json.loads(text) if text else None)
     except urllib.error.HTTPError as err:
