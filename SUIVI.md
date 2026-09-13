@@ -896,8 +896,8 @@ automatique a fonctionné à chaque fois.
 ## Phase 6 — Fin
 
 - [x] **ghosteo.eu basculé sur control-01 le 13/09/2026** (voir le détail plus bas)
-- [~] `servers.metrics_host` renseigné : **worker-01 fait (`172.31.40.3`)**, control-01 en
-      attente d'une règle de pare-feu (voir plus bas)
+- [x] **`servers.metrics_host` renseigné le 13/09/2026** : control-01 `172.31.40.2`,
+      worker-01 `172.31.40.3`. Les deux blocs du moniteur sont allumés.
 - [ ] Sauvegarde finale de l'ancien serveur sur Object Storage
 - [ ] VPS OVH résilié
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
@@ -1257,7 +1257,7 @@ réseau de composition et sur `dokploy-network` : aucun réseau commun, et Docke
 ponts entre eux.
 
 **Le correctif tient en une ligne, mais le garde-fou de l'agent refuse de modifier un
-pare-feu de production, ce qui est sain.** À lancer par Guilhem :
+pare-feu de production, ce qui est sain.** Lancé par Guilhem le 13/09/2026 à 13h35 :
 
 ```
 ssh control-01 "ufw allow from 172.16.0.0/12 to any port 4500 proto tcp comment 'agent de metriques, conteneurs locaux'"
@@ -1295,6 +1295,25 @@ tomberait — avec une cause très difficile à deviner.
 réseaux sans jamais toucher `172.31.x`) et l'ajouter aux deux `cloud-init/`. Sur les
 machines existantes, cela demande un redémarrage du démon Docker — donc une courte coupure
 des sept cabinets sur worker-01, à planifier. Les réseaux déjà attribués ne bougent pas.
+
+#### Étape 3 close le 13/09/2026 : les deux blocs du moniteur sont allumés
+
+Règle `ufw` posée par Guilhem, les deux agents répondent depuis le conteneur du
+back-office, et les deux serveurs sont renseignés. Premier relevé complet :
+
+| Serveur | Adresse de l'agent | Processeur | Mémoire | Disque |
+|---|---|---|---|---|
+| control-01 | `172.31.40.2` | 23 % | 62 % (2,37 / 3,82 Go) | 41 % |
+| worker-01 | `172.31.40.3` | 3 % | 49 % (1,87 / 3,82 Go) | 46 % |
+
+**Le moniteur tourne proprement depuis la bascule** : aucune erreur dans le journal du
+planificateur, `deployments:advance` à la minute, `instances:check` toutes les cinq
+minutes, dernier contrôle enregistré à 13h40, **aucune instance hors service**.
+
+À noter : control-01 est plus chargé que worker-01 (62 % de mémoire contre 49 %) alors
+qu'il n'héberge que la recette et le back-office. C'est le prix de Dokploy, de son Postgres
+et de Traefik, qui vivent tous là. Sans conséquence aujourd'hui, mais c'est cette machine
+qu'il faudra surveiller en premier si le parc grossit, pas le worker.
 
 ## Notes
 
