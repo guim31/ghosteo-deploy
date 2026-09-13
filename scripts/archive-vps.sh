@@ -9,6 +9,7 @@
 # Pour chaque site Laravel trouvé sous /home/*/<domaine>/ :
 #   <bucket>/<AAAA-MM-JJ>/<site>/db.sql.gz.gpg       dump MySQL
 #   <bucket>/<AAAA-MM-JJ>/<site>/storage.tar.gz.gpg  storage/app (documents, factures…)
+#   <bucket>/<AAAA-MM-JJ>/<site>/public.tar.gz.gpg   avatars et signatures manuscrites
 #   <bucket>/<AAAA-MM-JJ>/<site>/env.gpg             le .env — il contient APP_KEY,
 #                                                    sans laquelle la base est illisible
 #   <bucket>/<AAAA-MM-JJ>/MANIFESTE.txt              taille et empreinte de chaque objet
@@ -76,6 +77,7 @@ for dir in "${SITES[@]}"; do
     ok=1
     save "$dir" db      "$DATE/$site/db.sql.gz.gpg"      || ok=0
     save "$dir" storage "$DATE/$site/storage.tar.gz.gpg" || ok=0
+    save "$dir" public  "$DATE/$site/public.tar.gz.gpg"  || ok=0
     save "$dir" env     "$DATE/$site/env.gpg"            || ok=0
     [ $ok -eq 1 ] || failed+=("$site")
 done

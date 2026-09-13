@@ -5,6 +5,7 @@
 # identifiant Scaleway. Pour chaque site Laravel trouvé sous /home/*/<domaine>/ :
 #   <site>/<AAAA-MM-JJ>/db.sql.gz.gpg   dump MySQL
 #   <site>/<AAAA-MM-JJ>/storage.tar.gz.gpg   storage/app (documents patients, factures…)
+#   <site>/<AAAA-MM-JJ>/public.tar.gz.gpg    public/avatars et public/signature
 #   <site>/<AAAA-MM-JJ>/env.gpg   le .env — il contient APP_KEY, sans laquelle la base est illisible
 # Tout est chiffré en AES-256 (gpg symétrique) AVANT de quitter le Beelink, en flux :
 # rien n'est écrit sur le disque local. Passphrase : ~/.config/ghosteo-backup/passphrase
@@ -59,6 +60,7 @@ for dir in "${SITES[@]}"; do
     ok=1
     save "$dir" db      "$site/$DATE/db.sql.gz.gpg"    || ok=0
     save "$dir" storage "$site/$DATE/storage.tar.gz.gpg" || ok=0
+    save "$dir" public  "$site/$DATE/public.tar.gz.gpg"  || ok=0
     save "$dir" env     "$site/$DATE/env.gpg"           || ok=0
     [ $ok -eq 1 ] || failed+=("$site")
 done

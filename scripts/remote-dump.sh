@@ -1,5 +1,5 @@
 #!/bin/bash
-# Exécuté SUR LE VPS, reçu par « ssh vito@vps bash -s -- <répertoire du site> <db|storage|env> ».
+# Exécuté SUR LE VPS, reçu par « ssh vito@vps bash -s -- <répertoire du site> <db|storage|public|env> ».
 # Écrit le résultat sur la sortie standard, rien sur le disque, aucun secret affiché.
 set -euo pipefail
 dir=$1
@@ -27,6 +27,16 @@ case "$mode" in
         # du site, illisibles pour vito : on lit en sudo (lecture seule) quand c'est possible.
         if sudo -n true 2>/dev/null; then t="sudo -n tar"; else t=tar; fi
         $t -C storage --exclude='app/backups/temp' --exclude='app/backups/restore_temp' -czf - app
+        ;;
+    public)
+        # Avatars et signatures manuscrites. Ils vivent sous public/ et NON sous storage/ :
+        # le mode « storage » ne les voit donc pas, ce qui a fait perdre treize fichiers
+        # lors des migrations de septembre 2026. Voir SUIVI.md et
+        # https://github.com/guim31/ghosteo/issues/204
+        # Mode à part, et pas une extension de « storage » : migrate-instance.py extrait
+        # l'archive « storage » à la racine du volume, où public/ n'aurait rien à faire.
+        if sudo -n true 2>/dev/null; then t="sudo -n tar"; else t=tar; fi
+        $t -czf - public/avatars public/signature
         ;;
     env)
         cat .env

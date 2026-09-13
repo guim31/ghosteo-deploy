@@ -1507,6 +1507,49 @@ butoir du 13/10/2026 en première ligne. Texte source conservé dans
 
 **Confirmé par Xavier PAGES le 13/09/2026 : ses signatures sont bien revenues.**
 
+#### Correctif écrit le 13/09/2026 : PR https://github.com/guim31/ghosteo/pull/205
+
+Une entrée d'image de plus, `docker/entrypoint.d/45-ghosteo-public-assets.sh`, qui déplace
+les deux répertoires dans `storage/app/public-assets/` au premier démarrage et laisse un
+lien symbolique à leur place. Muette au démarrage suivant.
+
+**`cp -an` est le cœur du correctif** : ce qui est déjà dans le volume fait foi et n'est
+jamais écrasé par la version figée de l'image. C'est ce qui permet aux huit instances
+réparées à la main ce soir de garder leurs fichiers lors de la mise à jour.
+
+**Aucun changement côté code applicatif, et c'est vérifié avant d'écrire quoi que ce soit :**
+
+| Appelant | Pourquoi le lien ne le gêne pas |
+|---|---|
+| `UserController::storeReencodedImage()` | teste `is_dir()` avant `mkdir()`, ce qu'un lien vers un répertoire existant satisfait |
+| `ReglageController` (signature) | teste `file_exists()`, idem |
+| `UserController::deleteWebrootImage()` | compare deux `realpath()`, donc deux chemins résolus : le garde-fou anti-traversée tient |
+
+Ce sont les **seuls** endroits qui écrivent sous `public/` : `PatientFileController` et
+`MobileDocumentUploadController` n'y déclarent qu'un `chroot` à dompdf, en lecture.
+
+**Cinq scénarios éprouvés sur le banc du NAS, image construite et démarrée :**
+
+| Scénario | Résultat |
+|---|---|
+| Instance neuve, volume vierge | liens posés, `default.jpg` et `exemple_signature.webp` dans le volume, servis en 200 |
+| Dépôt d'une image par l'application | le fichier atterrit dans le volume, vérifié sur l'hôte, servi en 200 |
+| **Conteneur recréé** — le cas qui cassait | le fichier survit, le lien est toujours là |
+| Deuxième démarrage | entrée d'image muette, aucune reprise |
+| **Volume déjà garni** — l'état des huit instances | la signature du praticien est servie, un `default.jpg` modifié dans le volume **n'est pas écrasé** par l'image, et un fichier absent du volume y est récupéré |
+
+Le lien `public/storage` de Laravel reste intact dans tous les cas.
+
+#### Conséquence du même défaut : l'archive du VPS était incomplète
+
+`remote-dump.sh` ne connaissait que `storage/`. **L'archive finale du 13/09 ne contenait donc
+ni les avatars ni les signatures.** Un mode `public` a été ajouté — délibérément **à part**
+et non greffé sur le mode `storage`, parce que `migrate-instance.py` extrait l'archive
+`storage` à la racine du volume, où `public/` n'aurait rien à faire. `archive-vps.sh` et
+`backup-vps.sh` produisent désormais un quatrième artefact, et **l'archive finale a été
+rejouée** pour être complète avant la résiliation.
+
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
