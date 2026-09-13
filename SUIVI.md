@@ -414,10 +414,10 @@ après cette date. Les cinq autres cabinets sont en métropole, créneau de soir
 |---|---|---|---|---|
 | Guilhem HENRY | 12/09 08h29 | **12/09/2026**, coupure 3 min 30 | à faire | après le 12/10/2026 |
 | Xavier PAGES | 12/09 21h00 | **12/09/2026** | à faire | après le 12/10/2026 |
-| Cédric ROUSSEAU | | | | |
+| Cédric ROUSSEAU | 13/09 08h25 | **13/09/2026**, coupure 6 min | à faire | après le 13/10/2026 |
 | Aurélien MARIE-JOSEPH *(Martinique, 04h-11h heure de Paris)* | 12/09 09h06 Paris = 03h06 chez lui | **12/09/2026**, coupure 3 min 30 | prévenu par message le 12/09, réponse attendue à son réveil | après le 12/10/2026 |
-| Alexia GAUTHIER | | | | |
-| Adrien BLACHON | | | | |
+| Alexia GAUTHIER | 13/09 08h22 | **13/09/2026**, coupure 3 min | à faire | après le 13/10/2026 |
+| Adrien BLACHON | 13/09 08h31 | **13/09/2026**, coupure 5 min | à faire | après le 13/10/2026 |
 | Anaïs DELAUNAY *(Nouvelle-Calédonie, 13h-20h heure de Paris)* | 12/09 14h07 Paris = 00h07 chez elle | **12/09/2026**, coupure 8 min | à faire | après le 12/10/2026 |
 
 ### Cabinet de Guilhem migré le 12/09/2026 — première migration réelle
@@ -867,6 +867,31 @@ quelques secondes n'interrompt plus une migration en plein créneau.
 le 12/09 à 23h28), procédure corrigée et éprouvée, trois instances prêtes et leurs données
 déjà converties. Il ne manque qu'un créneau : les clients avaient été prévenus pour samedi
 21h, le choix du nouveau moment revient à Guilhem.
+
+### Les trois derniers cabinets migrés le 13/09/2026, 08h22 à 08h36
+
+Procédure corrigée, **trois sur trois du premier coup, sans intervention**. Chaque certificat
+obtenu dès la première demande : la marge de 90 s après la bascule DNS suffit à ce que les
+résolveurs de Let's Encrypt aient oublié l'ancienne adresse.
+
+| Cabinet | patients | consultations | comptabilités | comptes | ancien = nouveau |
+|---|---|---|---|---|---|
+| Alexia GAUTHIER | 12 | 24 | 24 | 2 | oui |
+| Cédric ROUSSEAU | 10 952 | 40 816 | 39 991 | 3 | oui |
+| Adrien BLACHON | 5 112 | 10 840 | 9 801 | 6 | oui |
+
+Déchiffrement vérifié sur un dossier réel de chacun, `hardware_id` conservé, aucune migration
+en attente, certificats à leur nom jusqu'au 11 ou 12/12/2026, redirection HTTP correcte.
+Contrôles faits **en visant l'adresse du serveur**, plus par un résolveur.
+
+**Les sept cabinets sont migrés.** Worker-01 : 8 instances (7 cabinets + la démo), 1 835 Mo de
+RAM sur 3 909, disque à 47 %. La projection de 148 Mo par instance se confirme.
+
+**Ce que cette phase 5 a coûté et appris.** Quatre bascules réussies du premier coup (Guilhem,
+Aurélien, Anaïs, Xavier), trois échecs le 12/09 au soir tous dus à la même faute de procédure
+— déclarer le domaine avant la bascule d'adresse — puis trois réussites après correction.
+Aucune donnée perdue, aucun client coupé plus longtemps que sa fenêtre : le retour arrière
+automatique a fonctionné à chaque fois.
 
 ## Phase 6 — Fin
 
