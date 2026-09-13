@@ -1121,6 +1121,64 @@ Les parties en lecture seule tournent déjà correctement :
 - **Découverte des instances** : les huit sont trouvées sur worker-01 avec leur nom de
   service, ce qui alimentera la commande `licences`.
 
+#### Étape A close et étape B réussie le 13/09/2026
+
+**PR #64 fusionnée par Guilhem à 10h16** (squash, commit `93a0907` sur `main`). Le workflow
+s'est déclenché tout seul et l'image **`ghcr.io/guim31/ghosteoeu-main:main-93a0907`**
+(842 Mo) était disponible **deux minutes plus tard**. Le `UNSTABLE` qui inquiétait était
+donc une vérification en cours, pas un échec. La chaîne « fusion → image » fonctionne du
+premier coup, sans le piège du tag posé par le `GITHUB_TOKEN` qui avait coûté deux versions
+à `ghosteo`.
+
+À noter pour les fois suivantes : **control-01 ne peut pas tirer une image privée lui-même**
+(`unauthorized`, aucun `/root/.docker/config.json`, et `registry.testRegistryById` n'en pose
+pas sur la machine du panneau). C'est le conteneur Dokploy qui détient les identifiants et
+qui tire par la socket partagée. Pour vérifier à la main qu'une image existe :
+`docker exec $(docker ps -q -f name=dokploy.1) docker pull <image>`.
+
+**Répétition à blanc réussie**, sans aucune coupure : service `ghosteo-backoffice-w33xq9`
+(`composeId 5WO2v6K-LUp6RKRdghk_q`) sur control-01, quatre conteneurs, sauvegarde à chaud
+du VPS (base 597 Ko comprimée, `storage` 32 Mo), restauration, et **copie conforme à la
+source** — 24 tables comparées, 59 813 lignes, dont 11 comptes, 10 licences, 10 instances,
+40 réglages, 7 offres. Les deux clés des licences hors-ligne sont bien dans le volume.
+Aucune migration en attente, `/up` et `/login` à 200. `scheduler` et `queue` sont arrêtés et
+le resteront jusqu'à la bascule.
+
+**La preuve qui comptait vraiment** : la copie déchiffre ses réglages et s'en sert.
+
+| Contrôle | Résultat |
+|---|---|
+| Réglages chiffrés relus | **7 sur 7** (jetons Dokploy, DNS Scaleway, métriques, Vito, Mailgun, webhook, gabarit .env) |
+| Version du panneau vue par la copie | v0.30.6 |
+| Serveurs vus dans Dokploy | 1 |
+| Environnement | `pC_5KlfCgctYLUpawSQS3` |
+
+**Piège à connaître si l'on refait ce contrôle** : une `APP_KEY` erronée ne lève **aucune
+erreur**. `Setting::getValueAttribute()` attrape l'échec de déchiffrement et renvoie `null`
+en silence. La preuve est donc qu'un réglage chiffré ressorte **non vide**, jamais l'absence
+d'exception. Et l'accesseur s'appelle `Setting::getValue()` : `Setting::get()` est la
+méthode d'Eloquent, qui part en `QueryException` sur une colonne inexistante.
+
+**Deux trouvailles DNS, dont une qui aurait fait une panne silencieuse :**
+
+1. **`www.ghosteo.eu` porte AUSSI un enregistrement AAAA**, pas seulement l'apex. Mon
+   contrôle ne regardait que le nom principal. Corrigé : les deux noms sont vérifiés, et les
+   deux AAAA sont à supprimer. control-01 n'ayant pas d'IPv6 publique, un AAAA oublié
+   laisserait les visiteurs en IPv6 sur l'ancien serveur sans que rien ne le signale.
+2. **Aucun enregistrement CAA** sur la zone : aucune autorité de certification n'est
+   restreinte, Let's Encrypt pourra délivrer.
+
+Le reste de la zone ne bouge pas : `mail`, `autoconfig` et `autodiscover` pointent vers OVH
+(courrier), `panel.ghosteo.eu` est déjà sur control-01.
+
+**Point relevé pour l'étape 4, pas avant** : `staging.ghosteoapp.eu` pointe encore vers le
+VPS. La recette tourne pourtant sur control-01 sous `staging-scw.ghosteoapp.eu`. Éteindre le
+VPS tuera donc l'ancien nom : à repointer ou à retirer avant la résiliation.
+
+**Ce qui reste pour l'étape C, et c'est à Guilhem** : chez OVH, zone DNS de `ghosteo.eu`,
+abaisser le TTL des deux A à **60 s** (adresses inchangées) et **supprimer les deux AAAA**.
+À faire au moins une heure avant la bascule, le TTL actuel étant de 3 600 s.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a

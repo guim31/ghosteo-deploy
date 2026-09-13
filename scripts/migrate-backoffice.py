@@ -400,11 +400,16 @@ def etat_dns():
             lignes.append(f"  {nom:18} vu par {r:8} : {vu or '(rien)'}")
             if vu != IP_CONTROL:
                 ok = False
-    v6 = dns_lu(DOMAINE, NS_AUTORITE, "AAAA")
-    attendu = v6 if v6 else "aucun — c'est ce qu'il faut"
-    lignes.append(f"  {DOMAINE:18} AAAA (IPv6)         : {attendu}")
-    if v6:
-        ok = False
+    # L'IPv6 se vérifie sur CHAQUE nom : `www` en porte une aussi, découvert le
+    # 13/09/2026. control-01 n'a pas d'adresse IPv6 publique, donc un AAAA oublié
+    # laisserait les visiteurs en IPv6 sur l'ancien serveur, sans que rien ne le signale.
+    v6 = False
+    for nom in DOMAINES:
+        rep = dns_lu(nom, NS_AUTORITE, "AAAA")
+        lignes.append(f"  {nom:18} AAAA (IPv6)         : "
+                      + (rep if rep else "aucun — c'est ce qu'il faut"))
+        if rep:
+            v6, ok = True, False
     print("\n".join(lignes))
     return ok, bool(v6)
 
@@ -512,8 +517,9 @@ def cmd_basculer(a):
 
     1. Modifier l'enregistrement  A     {DOMAINE:18} → {IP_CONTROL}
     2. Modifier l'enregistrement  A     www.{DOMAINE:14} → {IP_CONTROL}
-    3. SUPPRIMER l'enregistrement AAAA  {DOMAINE:18} (l'IPv6 de l'ancien VPS ;
-       control-01 n'en a pas, les visiteurs en IPv6 resteraient sur l'ancien serveur)
+    3. SUPPRIMER les DEUX enregistrements AAAA : {DOMAINE} et www.{DOMAINE}
+       (l'IPv6 de l'ancien VPS ; control-01 n'en a pas, les visiteurs en IPv6
+       resteraient sur l'ancien serveur sans que rien ne le signale)
 
   Ne toucher à RIEN d'autre : les MX, le SPF et le CNAME « mail » portent ton courrier.
 
@@ -660,7 +666,7 @@ def cmd_retour_arriere(a):
   1. Chez OVH, zone DNS de {DOMAINE} :
        A     {DOMAINE:18} → {IP_VPS}
        A     www.{DOMAINE:14} → {IP_VPS}
-       AAAA  {DOMAINE:18} → 2001:41d0:404:200::9036   (à rétablir)
+       AAAA  {DOMAINE} et www.{DOMAINE} → 2001:41d0:404:200::9036   (à rétablir)
 
   2. Ici, quand les adresses sont revenues :
        scripts/migrate-backoffice.py service
