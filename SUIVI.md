@@ -1375,13 +1375,25 @@ silencieux étant le pire des résultats pour une sauvegarde.
 
 | # | À faire | Qui | Quand |
 |---|---|---|---|
-| 1 | **Renouveler le VPS SANS engagement** (11,29 € HT/mois, contre 9,79 € avec 12 mois) | Guilhem | **avant le 23/09/2026** |
+| 1 | ~~Renouveler le VPS sans engagement~~ — **rien à faire, vérifié le 13/09/2026** | — | — |
 | 2 | Les sept cabinets confirment qu'ils travaillent normalement | Guilhem | à son rythme |
 | 3 | Décider du sort de cinq enregistrements DNS qui pointent encore vers le VPS | Guilhem | avant la résiliation |
 | 4 | Laisser passer les 30 jours de conservation des anciennes instances | — | jusqu'au 13/10 |
 
-**Le point 1 a une échéance proche et coûte de l'argent s'il est manqué** : un engagement de
-douze mois immobiliserait 117 € pour une machine qui ne sert plus qu'un mois.
+**Le point 1 s'est révélé sans objet, capture d'écran de l'espace client OVH à l'appui**
+(13/09/2026). Le VPS est **déjà « Sans engagement »** et déjà en **renouvellement
+automatique mensuel** : la période payée d'avance court jusqu'au 23/09/2026, puis il
+bascule tout seul au tarif sans engagement, 11,29 € HT/mois. **Il n'y a donc aucune action,
+et surtout aucun bouton à cliquer.**
+
+⚠️ **Le piège est l'inverse de ce que j'avais écrit** : la page « Gérer mon engagement » mène
+à un écran « **Se réengager** » qui ne propose que 6 mois (10,79 €) ou 12 mois (9,79 €),
+avec paiement immédiat de la totalité — 64,74 € HT pour six mois. La suivre aurait fait
+payer six mois d'avance pour une machine qui s'éteint en octobre. Ne pas y aller.
+
+Conséquence pour la résiliation : elle prendra effet à l'échéance mensuelle suivante. Une
+résiliation lancée mi-octobre court donc jusqu'au 23/10/2026, ce qui laisse même un peu de
+marge au-delà des trente jours de conservation.
 
 **Le point 3, en détail.** Dans la zone `ghosteoapp.eu`, cinq enregistrements désignent
 encore `51.178.87.41` ou une ressource morte :
