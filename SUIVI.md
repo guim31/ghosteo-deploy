@@ -1449,6 +1449,58 @@ futur », ce qui a fait soupçonner une horloge déréglée sur le worker. Véri
 les quatre machines et la référence externe sont d'accord à deux secondes près. C'était moi
 qui raisonnais sur l'heure d'une commande lancée plusieurs heures plus tôt.
 
+## Incident : avatars et signatures manuscrites perdus à la migration (13/09/2026, 22h30)
+
+**Signalé par Guilhem**, qui teste l'instance de Xavier PAGES avec son accord : son avatar
+ne s'affiche plus, et les signatures manuscrites de Xavier et de sa collègue ont disparu.
+La signature n'est pas un détail — **sans elle, aucune note d'honoraires ne peut être
+éditée** (l'écran des réglages le dit).
+
+**Cause, trouvée en dix minutes et générale à toutes les migrations.** Ces fichiers ne
+vivent pas dans `storage/app` mais dans **`public/avatars/` et `public/signature/`**, à la
+racine de l'application. Or la sauvegarde de migration (`remote-dump.sh`, mode `storage`)
+fait `tar -C storage … app` : elle n'a jamais regardé `public/`. Les fichiers sont donc
+restés sur le VPS, tandis que la base, elle, continuait de les référencer
+(`users.avatar`, `users.signature`).
+
+Ampleur relevée : **13 fichiers manquants chez 5 cabinets sur 7**.
+
+| Cabinet | Références en base | Manquants avant réparation |
+|---|---|---|
+| Guilhem HENRY | 4 | 4 |
+| Xavier PAGES | 4 | 4 |
+| Adrien BLACHON | 3 | 3 |
+| Aurélien MARIE-JOSEPH | 2 | 1 *(il en avait redéposé une lui-même)* |
+| Cédric ROUSSEAU | 1 | 1 |
+| Alexia GAUTHIER, Anaïs DELAUNAY, démo | 0 | 0 |
+
+**Réparé le soir même, sans aucune coupure** : les fichiers ont été tirés du VPS et déposés
+dans les conteneurs en service (flux direct VPS → worker, sans passer par le Beelink, ce
+sont des données personnelles). Vérifié : **toutes les références se résolvent**, et les
+images sont réellement servies en HTTP 200 avec le bon type.
+
+**⚠️ La réparation est fragile et ne doit pas être prise pour un correctif.**
+`public/` appartient à l'**image**, pas à un volume : **le prochain redéploiement d'une
+instance effacera de nouveau ces fichiers.** Ne pas lancer de mise à jour du parc avant le
+correctif durable.
+
+Par précaution immédiate, une copie a été déposée dans `storage/app/public-assets/` de
+chaque volume, que la sauvegarde nocturne prendra dès ce soir : jusqu'ici ces fichiers
+**n'étaient dans aucune sauvegarde**, ni l'ancienne ni la nouvelle.
+
+**Correctif durable proposé, à faire avant le 13/10** (date à laquelle le VPS, seule autre
+copie, disparaît) : que l'entrée d'image (`docker/entrypoint.d/`) déplace ces deux
+répertoires dans le volume `storage` et les remplace par des liens symboliques. Trois
+avantages sur l'ajout de volumes dans le gabarit compose :
+
+1. Il vaut pour **toutes** les instances, y compris celles que le back-office créera
+   lui-même — son propre gabarit compose (`DokployComposeTemplate`) devrait sinon être
+   modifié en parallèle, avec le risque de divergence.
+2. Les fichiers entrent **automatiquement dans la sauvegarde**, qui prend déjà `storage/app`.
+3. Un seul volume par instance, comme aujourd'hui.
+
+Il demande une PR sur `ghosteo`, une image, puis la cascade de mise à jour du parc.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
