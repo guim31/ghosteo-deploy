@@ -1414,6 +1414,41 @@ passphrase de déchiffrement est dans `~/.config/ghosteo-backup/passphrase` sur 
 et **une copie doit être dans le gestionnaire de mots de passe** — sans elle, les deux
 dépôts ne valent rien.
 
+#### Point 3, confirmation des cabinets — mesure objective du 13/09/2026 (22h)
+
+Plutôt que de solliciter les sept praticiens, on peut savoir lesquels **travaillent déjà**
+sur le nouvel hébergement : les anciennes instances sont en maintenance, donc **figées**
+depuis leur bascule. Tout écart de compteur entre l'ancienne et la nouvelle est du travail
+réellement saisi après la migration.
+
+| Cabinet | Patients | Consultations | Comptabilités | Verdict |
+|---|---|---|---|---|
+| Guilhem HENRY | +1 | +5 | +5 | **utilise le nouvel hébergement** |
+| Adrien BLACHON | +1 | +2 | +2 | **utilise le nouvel hébergement** |
+| Aurélien MARIE-JOSEPH | +1 | +2 | +2 | **utilise le nouvel hébergement** |
+| Alexia GAUTHIER | 0 | 0 | 0 | pas encore rouvert |
+| Anaïs DELAUNAY | 0 | 0 | 0 | pas encore rouvert |
+| Cédric ROUSSEAU | 0 | 0 | 0 | pas encore rouvert |
+| Xavier PAGES | 0 | 0 | 0 | pas encore rouvert |
+
+**Le silence des quatre derniers ne veut rien dire de mauvais** : le 13/09/2026 est un
+dimanche, et trois d'entre eux ont été migrés le matin même. Une relance est dans
+`notes/messages-clients.md`.
+
+**Deux indicateurs essayés et écartés, pour ne pas les réessayer :**
+
+1. **La table `sessions` ne prouve rien.** Laravel y purge les sessions expirées, elle ne
+   montre donc que les deux dernières heures. Elle annonçait « jamais connecté » pour six
+   cabinets sur huit, dont celui de Guilhem, qui y travaille pourtant.
+2. **`activity_log` ne trace que la consultation de documents patients**, pas les
+   connexions ni les saisies. 28 lignes en tout sur l'instance de Guilhem, la dernière du
+   08/09.
+
+**Fausse alerte écartée au passage** : une date de consultation apparaissait « dans le
+futur », ce qui a fait soupçonner une horloge déréglée sur le worker. Vérification faite,
+les quatre machines et la référence externe sont d'accord à deux secondes près. C'était moi
+qui raisonnais sur l'heure d'une commande lancée plusieurs heures plus tôt.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a

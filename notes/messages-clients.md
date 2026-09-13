@@ -52,3 +52,31 @@ Rédigés le 12/09/2026, après les migrations de Guilhem, Aurélien et Anaïs.
 >
 > Bien cordialement,
 > Guilhem HENRY
+
+---
+
+## Relance de confirmation, à envoyer aux cabinets qui n'ont pas encore travaillé dessus
+
+Rédigée le 13/09/2026. À n'envoyer qu'aux praticiens dont l'instance ne montre **aucune
+donnée créée depuis la bascule** — inutile de solliciter ceux qui l'utilisent déjà, leur
+activité vaut confirmation. La façon de le savoir est dans `SUIVI.md` : comparer les
+compteurs de l'ancienne instance, figée en maintenance, à ceux de la nouvelle.
+
+> Bonjour [Prénom],
+>
+> Petit message de suivi après le déménagement de votre GHosteo.
+>
+> Quand vous aurez un moment, pourriez-vous vous y connecter et faire une manipulation
+> ordinaire — ouvrir un dossier patient, consulter votre agenda ? Juste pour me confirmer
+> que tout se comporte normalement de votre côté.
+>
+> Rappel utile si vous n'y êtes pas retourné depuis : **rechargez la page** avant de vous
+> connecter (Cmd + R sur Mac, Ctrl + F5 sur PC), sinon un message « Session expirée » peut
+> apparaître. Il est sans gravité.
+>
+> Un mot suffit, même « tout va bien ». L'ancien hébergement est conservé jusqu'à
+> mi-octobre, ce qui me laisse la possibilité de revenir en arrière si quelque chose
+> clochait. Passé cette date, il sera supprimé.
+>
+> Merci à vous,
+> Guilhem
