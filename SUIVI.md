@@ -1085,6 +1085,42 @@ des déploiements. La changer rendrait le back-office incapable de piloter quoi 
 `LICENSE_SERVER_URL=https://ghosteo.eu` et suivent donc le DNS sans aucune modification.
 Stripe et Mailgun aussi ; Stripe réémet ses webhooks en cas d'échec.
 
+#### Point d'arrêt du 13/09/2026 : la PR #64 attend Guilhem
+
+Au 13/09 à 10h10, la PR #64 est **ouverte, fusionnable, mais GitHub la dit `UNSTABLE`** :
+une vérification n'y est pas au vert — en cours, en attente, ou en échec, impossible de le
+savoir d'ici. Le jeton GitHub n'a ni « Checks » ni « Actions » en lecture (403 sur
+`/commits/<sha>/check-runs`, sur `/actions/runs` et sur l'API des paquets). C'est cohérent
+avec le périmètre choisi le 27/08/2026, et ce n'est pas à corriger pour si peu.
+
+**Les trois commandes de `tests.yml` ont été rejouées à l'identique sur le banc du NAS, et
+les trois passent**, y compris avec un `.env` neuf recopié depuis le `.env.example`
+modifié — c'était la seule différence non couverte par la première vérification :
+
+| Étape de la CI | Résultat sur le banc |
+|---|---|
+| `php artisan test` (SQLite en mémoire) | 423 tests, 1 149 assertions |
+| `vendor/bin/pint --test -v` | 292 fichiers |
+| `vendor/bin/phpstan analyse --memory-limit=2G` | aucune erreur |
+| `npm ci && npm run build` (Node 22) | 6 fichiers produits, 13 s |
+
+Les deux fichiers de workflow sont par ailleurs du YAML valide.
+
+**À regarder par Guilhem sur la page de la PR** : si la vérification est simplement en
+cours, il n'y a rien à faire ; si elle est en échec, le message dira quoi. Une piste à
+écarter en premier, vu l'historique : le **budget GitHub Actions**, épuisé en août 2026,
+et sollicité toute la semaine par les images de `ghosteo`.
+
+#### Vérifications à blanc de l'outil, faites le 13/09/2026
+
+Les parties en lecture seule tournent déjà correctement :
+
+- **État DNS** : les quatre sondes (autorité OVH + Google, Cloudflare, Quad9) répondent
+  `51.178.87.41` pour `ghosteo.eu` et `www`, et l'**AAAA `2001:41d0:404:200::9036` est bien
+  là**. L'outil conclut « pas prêt à déclarer les domaines », ce qui est la bonne réponse.
+- **Découverte des instances** : les huit sont trouvées sur worker-01 avec leur nom de
+  service, ce qui alimentera la commande `licences`.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
