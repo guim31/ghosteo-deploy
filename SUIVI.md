@@ -895,10 +895,39 @@ automatique a fonctionné à chaque fois.
 
 ## Phase 6 — Fin
 
-- [ ] ghosteo.eu basculé
+- [ ] ghosteo.eu basculé sur control-01
+- [ ] `servers.metrics_host` renseigné (`172.31.40.2`, `172.31.40.3`) : les métriques du
+      moniteur ne s'allument qu'une fois le back-office dans le réseau privé
 - [ ] Sauvegarde finale de l'ancien serveur sur Object Storage
 - [ ] VPS OVH résilié
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
+
+### Ce que la phase 6 doit savoir avant de commencer
+
+**ghosteo.eu n'est pas une instance cliente.** `migrate-instance.py` ne convient pas tel
+quel : il suppose SQLite, un service compose GHosteo et un volume `storage`. Le back-office
+est une autre application, avec sa propre base et ses propres réglages chiffrés. La bascule
+demande donc un travail à part, à concevoir — les briques réutilisables sont la sauvegarde
+(`remote-dump.sh`), la conversion si l'on veut SQLite, et la méthode DNS (TTL abaissé la
+veille, domaine déclaré **après** la bascule, marge de 90 s).
+
+**Trois pièges qui ont coûté cher en phase 5, à ne pas réapprendre :**
+
+1. Déclarer le domaine avant la bascule DNS fait échouer ACME et épuise le quota de
+   Let's Encrypt (cinq échecs par nom et par heure). Déclarer après, avec 90 s de marge.
+2. Toute vérification qui passe par un résolveur peut mesurer l'ancien serveur et faire
+   passer un échec pour une réussite. Viser l'adresse (`curl --resolve`).
+3. `domain.delete` ne retire pas les étiquettes Traefik des conteneurs déjà créés.
+
+**Points ouverts sans rapport avec la phase 6**, à ne pas perdre :
+
+- Le résolveur DNS du Beelink tombe par intermittence (deux fois le 12/09). Il résout via la
+  passerelle UniFi alors qu'AdGuard tourne sur le Beelink lui-même : aller-retour inutile,
+  et le Beelink perd son DNS si la boucle se casse. Diagnostic proposé, non fait.
+- Issue https://github.com/guim31/ghosteo/issues/203 : réduire le cache de code PHP,
+  environ 50 Mo par instance.
+- L'en-tête `strict-transport-security` est émis deux fois, par nginx et par Traefik.
+- Les sept cabinets doivent confirmer, chacun, qu'ils se connectent normalement.
 
 ## Notes
 
