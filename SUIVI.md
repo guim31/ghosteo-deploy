@@ -1549,6 +1549,20 @@ et non greffé sur le mode `storage`, parce que `migrate-instance.py` extrait l'
 `backup-vps.sh` produisent désormais un quatrième artefact, et **l'archive finale a été
 rejouée** pour être complète avant la résiliation.
 
+Deux défauts corrigés pendant cette reprise :
+
+1. **`ghosteo.eu` faisait échouer l'archive** : le back-office n'a ni `public/avatars` ni
+   `public/signature`, et `tar` s'arrêtait sur des répertoires absents. Le mode n'archive
+   désormais que ce qui existe, et produit une archive vide quand il n'y a rien — ce qui
+   dit « rien à sauvegarder ici » au lieu de faire sonner l'alarme.
+2. **Un passage partiel réécrivait le manifeste complet** avec les seules lignes du site
+   demandé, effaçant la trace de tous les autres. `archive-vps.sh <domaine>` laisse
+   maintenant le manifeste intact et le dit.
+
+**Archive finale vérifiée** : 10 sites, **41 objets, 698 Mo**, manifeste complet
+(40 lignes d'artefacts dont 10 `public`). Contrôle par déchiffrement réel : 55 images pour
+le cabinet de Guilhem, 6 pour celui de Xavier, 0 pour `ghosteo.eu` — ce qui est exact.
+
 
 ## Notes
 

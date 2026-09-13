@@ -82,6 +82,14 @@ for dir in "${SITES[@]}"; do
     [ $ok -eq 1 ] || failed+=("$site")
 done
 
+# Un passage partiel (archive-vps.sh <domaine>) ne réécrit PAS le manifeste : il ne
+# contiendrait que ce seul site et effacerait la trace de tous les autres.
+if [ -n "$ONLY" ]; then
+    [ ${#failed[@]} -gt 0 ] && { log "== TERMINÉ AVEC ERREURS : ${failed[*]}"; exit 1; }
+    log "== Terminé ($ONLY) — manifeste inchangé, le relancer en entier pour le régénérer"
+    exit 0
+fi
+
 {
     echo "Archive finale du VPS OVH vps-fdce4053 (51.178.87.41), $DATE"
     echo "Chiffrement : gpg symétrique AES-256, passphrase du gestionnaire de mots de passe."

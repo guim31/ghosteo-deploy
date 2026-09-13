@@ -36,7 +36,18 @@ case "$mode" in
         # Mode à part, et pas une extension de « storage » : migrate-instance.py extrait
         # l'archive « storage » à la racine du volume, où public/ n'aurait rien à faire.
         if sudo -n true 2>/dev/null; then t="sudo -n tar"; else t=tar; fi
-        $t -czf - public/avatars public/signature
+        liste=""
+        for r in public/avatars public/signature; do
+            [ -d "$r" ] && liste="$liste $r"
+        done
+        if [ -n "$liste" ]; then
+            $t -czf - $liste
+        else
+            # Le back-office ghosteo.eu n'a ni avatars ni signatures : il n'est pas
+            # l'application des cabinets. Une archive vide vaut mieux qu'un échec —
+            # elle dit « rien à sauvegarder ici » au lieu de faire sonner l'alarme.
+            $t -czf - --files-from /dev/null
+        fi
         ;;
     env)
         cat .env
