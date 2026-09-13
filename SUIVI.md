@@ -898,7 +898,8 @@ automatique a fonctionné à chaque fois.
 - [x] **ghosteo.eu basculé sur control-01 le 13/09/2026** (voir le détail plus bas)
 - [x] **`servers.metrics_host` renseigné le 13/09/2026** : control-01 `172.31.40.2`,
       worker-01 `172.31.40.3`. Les deux blocs du moniteur sont allumés.
-- [ ] Sauvegarde finale de l'ancien serveur sur Object Storage
+- [x] **Sauvegarde finale de l'ancien serveur faite le 13/09/2026**, et sauvegarde
+      nocturne du nouvel hébergement mise en place (elle n'existait pas)
 - [ ] VPS OVH résilié
 - [ ] Clés Scaleway et Dokploy révoquées et recréées
 
@@ -1314,6 +1315,92 @@ minutes, dernier contrôle enregistré à 13h40, **aucune instance hors service*
 qu'il n'héberge que la recette et le back-office. C'est le prix de Dokploy, de son Postgres
 et de Traefik, qui vivent tous là. Sans conséquence aujourd'hui, mais c'est cette machine
 qu'il faudra surveiller en premier si le parc grossit, pas le worker.
+
+#### Étape 4, sauvegardes — faite le 13/09/2026, et un manque comblé au passage
+
+**Archive finale de l'ancien VPS** : `scripts/archive-vps.sh`, 10 sites, 31 objets,
+**687 Mo** dans un dépôt neuf, `ghosteo-archive-vps-ovh`. Elle vit **à part et sans
+rétention** : la sauvegarde nocturne purge tout ce qui dépasse trente jours, une archive
+définitive posée dans le même dépôt aurait disparu au moment précis où elle aurait servi.
+Un `MANIFESTE.txt` y donne taille et empreinte de chaque objet, relues **depuis le stockage**
+et non calculées au départ.
+
+**Vérifiée en la restaurant réellement**, en flux, sans rien écrire sur disque :
+
+| Site | Tables recréées | Clé de chiffrement |
+|---|---|---|
+| ghosteo.eu | 30 | présente |
+| cedric-rousseau | 38 | présente |
+| guilhem-henry | 38 | présente |
+
+Les archives `storage` s'ouvrent aussi : 36 entrées pour le back-office, 238 pour le cabinet
+Blachon-Thivillier.
+
+**Trois archives `storage` ne font que 400 octets** — Alexia GAUTHIER, Cédric ROUSSEAU et la
+démo. Vérifié avant de s'en inquiéter : ces cabinets n'ont **aucun document déposé**, leur
+`storage/app` ne contient que `.gitignore`, `hardware_id` et un `public/` vide. Et les
+sauvegardes des 9, 10, 11 et 12/09 — **antérieures à leur migration** — font déjà la même
+taille : rien n'a été perdu en chemin.
+
+#### Le nouvel hébergement n'avait aucune sauvegarde. C'est réparé.
+
+C'est le point que j'avais signalé comme préalable à la résiliation : `backup-vps.sh` ne
+connaît que l'ancien VPS, dont les copies sont figées depuis les bascules. Éteindre le VPS
+aurait laissé les dossiers patients **à un seul endroit**.
+
+`scripts/backup-scaleway.sh` tourne désormais **chaque nuit à 3h15** sur le Beelink, vers le
+dépôt `ghosteo-backups-scaleway` (rétention 30 jours) : les huit instances, le back-office
+et la base du panneau. Premier passage : **28 objets, 677 Mo**.
+
+**Le piège de SQLite, et pourquoi une simple copie de fichier n'aurait pas suffi** : les
+bases des instances sont en mode **WAL**. Copier le fichier pendant que l'instance travaille
+donne une base tronquée, et le défaut ne se voit qu'à la restauration. La sauvegarde passe
+donc par `VACUUM INTO`, qui produit une copie cohérente sans arrêter l'instance. Ni l'hôte
+ni l'image n'ont le binaire `sqlite3` ; c'est le PDO SQLite de l'image (3.46.1) qui s'en
+charge.
+
+**Les huit sauvegardes ont été comparées aux bases vivantes**, une à une, après
+déchiffrement : *patients*, *consultations* et *comptes* identiques partout, et
+`PRAGMA integrity_check` à « ok » pour les huit.
+
+**Un défaut corrigé au premier passage** : `ssh hôte bash -s -- "$app" …` joint ses arguments
+par des espaces, donc un argument **vide disparaît** et décale tous les suivants. La
+sauvegarde du panneau partait ainsi avec les mauvais paramètres. Un tiret sert désormais de
+« sans objet ». Le script signale aussi tout artefact de moins de 200 octets, un échec
+silencieux étant le pire des résultats pour une sauvegarde.
+
+#### Quand le VPS peut-il être résilié ? Réponse au 13/09/2026
+
+**Pas avant le 13/10/2026**, et quatre choses restent à faire d'ici là.
+
+| # | À faire | Qui | Quand |
+|---|---|---|---|
+| 1 | **Renouveler le VPS SANS engagement** (11,29 € HT/mois, contre 9,79 € avec 12 mois) | Guilhem | **avant le 23/09/2026** |
+| 2 | Les sept cabinets confirment qu'ils travaillent normalement | Guilhem | à son rythme |
+| 3 | Décider du sort de cinq enregistrements DNS qui pointent encore vers le VPS | Guilhem | avant la résiliation |
+| 4 | Laisser passer les 30 jours de conservation des anciennes instances | — | jusqu'au 13/10 |
+
+**Le point 1 a une échéance proche et coûte de l'argent s'il est manqué** : un engagement de
+douze mois immobiliserait 117 € pour une machine qui ne sert plus qu'un mois.
+
+**Le point 3, en détail.** Dans la zone `ghosteoapp.eu`, cinq enregistrements désignent
+encore `51.178.87.41` ou une ressource morte :
+
+| Nom | Ce qu'il sert aujourd'hui | Proposition |
+|---|---|---|
+| `*` (joker) | c'est lui qui fait répondre `staging.ghosteoapp.eu` | pointer vers control-01, ou supprimer |
+| `@` et `www` | rien d'utile, l'ancien nginx par défaut | pointer vers control-01, ou supprimer |
+| `panel` | le panneau **Vito**, qui ne sert plus | supprimer |
+| `test-migration` | vestige des essais de la phase 3 | supprimer |
+
+La recette tourne déjà sur control-01 sous `staging-scw.ghosteoapp.eu`. Le plus simple est
+de lui rendre son nom `staging` au moment de la résiliation.
+
+**Ce qui est déjà acquis** : les données de l'ancien serveur sont archivées, chiffrées et
+vérifiées ; celles du nouvel hébergement sont sauvegardées chaque nuit et vérifiées ; la
+passphrase de déchiffrement est dans `~/.config/ghosteo-backup/passphrase` sur le Beelink,
+et **une copie doit être dans le gestionnaire de mots de passe** — sans elle, les deux
+dépôts ne valent rien.
 
 ## Notes
 

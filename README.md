@@ -17,6 +17,18 @@ puis les scripts d'installation des serveurs.
 - [`scripts/create-server.py`](scripts/create-server.py) — crée un serveur chez Scaleway (groupe de
   sécurité, IP fixe, machine, cloud-init) ; `scripts/scw.py` est le mini client d'API qu'il utilise.
   La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink.
+- [`scripts/archive-vps.sh`](scripts/archive-vps.sh) — **archive finale** du VPS OVH avant sa
+  résiliation, dans un dépôt à part et **sans rétention** : la sauvegarde nocturne purge à
+  30 jours, une archive définitive posée à côté d'elle disparaîtrait donc toute seule.
+- [`scripts/backup-scaleway.sh`](scripts/backup-scaleway.sh) — sauvegarde nocturne du **nouvel**
+  hébergement : les instances de worker-01 (base SQLite copiée par `VACUUM INTO`, car le mode WAL
+  rend une copie de fichier à chaud inexploitable), le back-office de control-01 et la base du
+  panneau Dokploy. `scripts/remote-dump-scaleway.sh` est le morceau qui tourne côté serveur.
+  Le Beelink tire et chiffre avant l'envoi ; les serveurs ne détiennent aucun identifiant.
+- [`scripts/migrate-backoffice.py`](scripts/migrate-backoffice.py) — bascule de `ghosteo.eu`
+  lui-même, qui n'est pas une instance cliente : base MySQL conservée, zone DNS chez OVH donc
+  changement d'adresses à la main, et mise en sommeil du planificateur de la copie tant que
+  l'ancien back-office tourne — deux ordonnanceurs ne doivent jamais coexister.
 - [`scripts/migrate-instance.py`](scripts/migrate-instance.py) — migration d'une instance cliente du
   VPS OVH vers un worker Dokploy, en quatre commandes (`ttl`, `preparer`, `basculer`, `verifier`).
   La clé de chiffrement de l'instance est conservée, sans quoi les dossiers patients seraient
