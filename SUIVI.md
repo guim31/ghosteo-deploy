@@ -1501,6 +1501,12 @@ avantages sur l'ajout de volumes dans le gabarit compose :
 
 Il demande une PR sur `ghosteo`, une image, puis la cascade de mise à jour du parc.
 
+**Issue ouverte le 13/09/2026 : https://github.com/guim31/ghosteo/issues/204**, avec la date
+butoir du 13/10/2026 en première ligne. Texte source conservé dans
+`notes/issue-avatars-signatures.md`.
+
+**Confirmé par Xavier PAGES le 13/09/2026 : ses signatures sont bien revenues.**
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
