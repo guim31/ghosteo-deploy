@@ -632,14 +632,27 @@ done
     for app_i, domaine in instances:
         print(f"  {domaine} ({app_i})")
 
-    etape("Oubli du cache de licence et nouvel appel, instance par instance")
+    etape("Oubli du cache de licence et nouvelle vérification, instance par instance")
+    # On appelle le service de licence DIRECTEMENT, et non une page publique : le
+    # contrôle de licence est un middleware nommé (`license.check`) posé sur les routes
+    # authentifiées. Visiter `/login` ne déclenche donc aucune vérification — première
+    # tentative du 13/09/2026, qui n'a rien prouvé du tout.
+    php = """<?php
+$s = app(\\App\\Services\\LicenseService::class);
+$s->flushCache();
+$d = $s->getLicenseDetails();
+echo '  statut=', ($d['status'] ?? '?'),
+     ' secours=', (!empty($d['is_fallback']) ? 'OUI' : 'non'), PHP_EOL;
+"""
     for app_i, domaine in instances:
         script = f"""set -uo pipefail
-docker exec {app_i}-web-1 php /var/www/html/artisan tinker \\
-  --execute='Cache::forget("ghosteo.license.details");' >/dev/null 2>&1 || true
-code=$(docker exec {app_i}-web-1 curl -s -o /dev/null -w '%{{http_code}}' --max-time 25 \\
-  -H 'X-Forwarded-Proto: https' -H 'Host: {domaine}' http://127.0.0.1:8080/login || true)
-echo "  {domaine} : /login $code"
+cat > /tmp/.lic-$$.php <<'PHPEOF'
+{php}PHPEOF
+trap 'rm -f /tmp/.lic-$$.php' EXIT
+docker cp /tmp/.lic-$$.php {app_i}-web-1:/tmp/lic.php >/dev/null
+r=$(docker exec {app_i}-web-1 php /var/www/html/artisan tinker /tmp/lic.php 2>&1 | grep -E '^  statut=' | head -1)
+docker exec {app_i}-web-1 rm -f /tmp/lic.php >/dev/null 2>&1 || true
+echo "  {domaine:44} ${{r:-AUCUNE REPONSE}}"
 """
         print(script_distant(WORKER, script).rstrip())
 

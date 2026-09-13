@@ -895,7 +895,7 @@ automatique a fonctionné à chaque fois.
 
 ## Phase 6 — Fin
 
-- [ ] ghosteo.eu basculé sur control-01
+- [x] **ghosteo.eu basculé sur control-01 le 13/09/2026** (voir le détail plus bas)
 - [ ] `servers.metrics_host` renseigné (`172.31.40.2`, `172.31.40.3`) : les métriques du
       moniteur ne s'allument qu'une fois le back-office dans le réseau privé
 - [ ] Sauvegarde finale de l'ancien serveur sur Object Storage
@@ -1178,6 +1178,56 @@ VPS tuera donc l'ancien nom : à repointer ou à retirer avant la résiliation.
 **Ce qui reste pour l'étape C, et c'est à Guilhem** : chez OVH, zone DNS de `ghosteo.eu`,
 abaisser le TTL des deux A à **60 s** (adresses inchangées) et **supprimer les deux AAAA**.
 À faire au moins une heure avant la bascule, le TTL actuel étant de 3 600 s.
+
+#### ghosteo.eu basculé le 13/09/2026, 12h49 à 13h02
+
+**Le serveur de licences tourne sur control-01.** Service `ghosteo-backoffice-w33xq9`,
+image `ghcr.io/guim31/ghosteoeu-main:main-93a0907`, quatre conteneurs (web, scheduler,
+queue, MySQL 8.4).
+
+Déroulé, TTL abaissé à 60 s et AAAA supprimés par Guilhem une heure plus tôt :
+
+| Moment | Ce qui s'est passé |
+|---|---|
+| 12h49 | ancien back-office en maintenance — son planificateur et sa file s'endorment avec lui |
+| 12h50 | sauvegarde à froid (base 598 Ko comprimée, `storage` 32 Mo) |
+| 12h52 | restauration, **copie conforme** : 24 tables, 59 868 lignes, 11 comptes, 10 licences, 10 instances, 40 réglages |
+| 12h55 | Guilhem bascule les deux enregistrements A vers `51.158.96.49` |
+| 12h58 | propagation constatée sur l'autorité OVH et les trois résolveurs publics, puis 90 s de marge |
+| 13h01 | domaines déclarés, **certificats délivrés du premier coup**, valides jusqu'au 12/12/2026 |
+| 13h02 | huit instances revalidées |
+
+**Contrôles finaux** : `/up` et `/login` à 200 sur les deux noms, HTTP redirigé en 301,
+certificats au bon nom, route `/api/v1/licenses/verify` vivante, aucune migration en
+attente, **13 ressources servies en `https`** sur la page de connexion — la preuve que le
+correctif `trustProxies` fait son office en production.
+
+**Les huit instances ont revalidé leur licence auprès du nouveau serveur** entre 13h01:28
+et 13h01:43 : toutes `active`, aucune en mode dégradé. Avant la bascule, leur dernière
+vérification datait de 08h00 ce matin.
+
+**Le décision d'y aller sans attendre une heure de plus** : le certificat en service datait
+du 11/08/2026, donc les résolveurs de Let's Encrypt n'avaient rien en cache pour ce nom et
+l'attente n'aurait protégé de rien. Le seul risque résiduel — un résolveur tiers gardant
+l'ancienne adresse jusqu'à une heure — était sans conséquence : une vérification de licence
+qui échoue retombe sur le cache de 12 heures et réessaie cinq minutes plus tard.
+
+**Un défaut de ma commande de vérification, trouvé et corrigé sur le coup.** Le premier
+passage annonçait « /login 200 » pour les huit instances alors qu'**aucune n'avait
+revalidé** : les dates restaient à 08h00. Cause : le contrôle de licence est un middleware
+nommé (`license.check`) posé sur les routes **authentifiées**. Visiter `/login` ne déclenche
+donc rien du tout. La commande appelle désormais `LicenseService::flushCache()` puis
+`getLicenseDetails()` directement dans le conteneur, ce qui est le seul déclencheur fiable.
+*Le premier résultat était un faux positif silencieux : il aurait fait conclure à une
+réussite sans qu'aucune instance n'ait parlé au nouveau serveur.*
+
+**L'ancien back-office reste en maintenance sur le VPS**, intact, avec ses données du
+13/09 à 12h50. Retour arrière : remettre les deux A sur `51.178.87.41` puis
+`migrate-backoffice.py service`.
+
+**Le TTL de `ghosteo.eu` et `www` reste à 60 s.** Sans inconvénient, mais à remonter à
+3 600 s une fois la bascule éprouvée quelques jours, pour épargner des requêtes aux
+résolveurs.
 
 ## Notes
 
