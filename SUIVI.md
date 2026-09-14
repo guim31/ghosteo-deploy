@@ -1747,6 +1747,62 @@ visibles. Ce sont les enfants des images étiquetées, qui doivent justement res
 2. Le paquet du back-office `ghosteoeu-main` ne crée pas d'orphelins, mais **accumule** un tag
    `main-<sha>` par fusion dans `main`. Une règle `keep-n-tagged` en garderait les N derniers.
 
+## État des lieux du 14/09/2026, fin de journée
+
+Relevé réel, pas reconstitué : versions en service, réglages du back-office, pull requests, DNS.
+
+### Ce qui tourne
+
+| Élément | Version en service | Écart |
+|---|---|---|
+| Les 7 cabinets et la démo, worker-01 | **1.17.0** | la 1.17.1 est publiée mais **pas déployée** : la réparation des signatures reste provisoire |
+| Recette `staging.ghosteoapp.eu`, control-01 | `:develop` | à jour, suit `develop` toute seule |
+| Back-office ghosteo.eu, control-01 | `main-93a0907` | **#65 et #66 fusionnées aujourd'hui, non déployées** ; image `main-b93df79` publiée, avec une migration |
+| Réglage `deploy_image` du back-office | 1.17.0 | à passer en 1.17.1 après la cascade |
+
+**Le back-office n'a aucune procédure de mise à jour.** Du temps de Vito, Guilhem cliquait sur
+« déployer » ; aujourd'hui une fusion dans `main` publie une image que rien ne déploie. C'est la
+moitié de son impression de « perdre la main ». Geste actuel : changer `GHOSTEO_IMAGE` du service
+`ghosteo-backoffice-w33xq9` sur control-01 et redéployer — à outiller et documenter.
+
+**Effet de bord de la bascule de `staging.ghosteoapp.eu` ce matin** : le moniteur du back-office
+garde deux fiches de recette. La #7 « Staging DEVELOP » (`staging.ghosteoapp.eu`, l'ancienne du VPS)
+est **en panne depuis 10:35 UTC**, avec le bon diagnostic : « ce domaine est servi par
+staging-scw ». La #10 est la vraie. Supprimer la #7 et donner à la #10 l'adresse `staging.ghosteoapp.eu`.
+
+Le ticket #204 a été fermé automatiquement à l'arrivée de 1.17.1 dans `main`, alors que ses critères
+ne seront remplis qu'après la cascade.
+
+### Cabinets : cinq sur sept travaillent sur le nouvel hébergement
+
+Écart entre les compteurs vivants et ceux de l'ancienne instance figée : Anaïs DELAUNAY +13
+consultations, Adrien BLACHON +11, Guilhem HENRY +9, Xavier PAGES +3, Aurélien MARIE-JOSEPH +2.
+**Aucune saisie encore chez Alexia GAUTHIER et Cédric ROUSSEAU**, relancés le 13/09.
+
+### Ce qui reste, par ordre d'urgence
+
+| # | Quoi | Qui | Échéance |
+|---|---|---|---|
+| 1 | Cascade du parc vers 1.17.1, écran *Mises à jour* du back-office | Guilhem | avant toute autre mise à jour, et avant le 13/10 |
+| 2 | `deploy_image` → 1.17.1 | agent ou Guilhem | juste après |
+| 3 | Déployer le back-office sur `main-b93df79`, et outiller ce geste | décision de Guilhem | dès que possible |
+| 4 | Nettoyer le moniteur : fiche #7 | agent | dès que possible |
+| 5 | Étape 5 : révoquer et recréer les clés — Scaleway `beelink-migration`, jeton Dokploy, jeton de l'agent de métriques, clé `backoffice-dns`, secret de webhook Stripe | ensemble | quand Guilhem veut |
+| 6 | Confirmations d'Alexia GAUTHIER et Cédric ROUSSEAU | Guilhem | avant le 13/10 |
+| 7 | TTL de `ghosteo.eu` et `www` de 60 à 3 600 s, chez OVH | Guilhem | cette semaine |
+| 8 | Zone `ghosteoapp.eu` : `@`, joker, `www`, `panel` pointent encore vers le VPS ; `test-migration` est un vestige | ensemble | le 13/10 |
+| 9 | Résilier le VPS, puis retirer le cron `backup-vps.sh` | Guilhem puis agent | à partir du 13/10 (effet au 23/10) |
+
+**Décisions en attente, non urgentes** : supprimer les images `essai-1` à `3` ; garder seulement les
+N dernières images du back-office ; corriger le piège des sous-réseaux Docker lors d'une fenêtre de
+maintenance ; retirer la permission « Workflows » du jeton GitHub.
+
+**Hors migration, relevé en passant** : PR #146 « agenda de prise de rendez-vous » en brouillon
+depuis le 26/08 (29 fichiers) ; trois PR Dependabot de montée majeure d'actions (#158 à #160) et une
+JS (#206) ; tickets de facturation électronique du back-office, dont le #2 portait une échéance au
+01/09/2026 ; points déjà notés — résolveur DNS du Beelink, #203 cache PHP, en-tête HSTS en double,
+page 419 sans issue, `docs/EXPLOITATION-SAUVEGARDES.md` périmé.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
