@@ -25,6 +25,10 @@ puis les scripts d'installation des serveurs.
   rend une copie de fichier à chaud inexploitable), le back-office de control-01 et la base du
   panneau Dokploy. `scripts/remote-dump-scaleway.sh` est le morceau qui tourne côté serveur.
   Le Beelink tire et chiffre avant l'envoi ; les serveurs ne détiennent aucun identifiant.
+- [`scripts/recette-suivre-develop.py`](scripts/recette-suivre-develop.py) — la recette
+  `staging.ghosteoapp.eu` suit l'image `:develop`, construite à chaque fusion. Cron du Beelink
+  toutes les 5 minutes. Il **tire avant de redéployer** : le tag est mouvant, et `docker compose
+  up -d` ne retire pas une image déjà en cache — redéployer sans tirer ne ferait rien.
 - [`scripts/migrate-backoffice.py`](scripts/migrate-backoffice.py) — bascule de `ghosteo.eu`
   lui-même, qui n'est pas une instance cliente : base MySQL conservée, zone DNS chez OVH donc
   changement d'adresses à la main, et mise en sommeil du planificateur de la copie tant que

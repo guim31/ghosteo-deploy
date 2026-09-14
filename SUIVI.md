@@ -1606,6 +1606,75 @@ repenser, pas à retoucher.
 est publiée, et il reste à lancer la cascade depuis le back-office pour rendre définitive la
 réparation des avatars et signatures.
 
+## La recette suit de nouveau `develop` (14/09/2026)
+
+**Inquiétude de Guilhem, fondée.** Depuis la migration, il avait l'impression de perdre la main
+sur les mises à jour. Vérification faite, son circuit fonctionnait encore — mais **uniquement
+grâce à l'ancien VPS**, et il se serait arrêté sans un mot le jour de la résiliation.
+
+| Maillon voulu | État au matin du 14/09 |
+|---|---|
+| pousser dans `develop` met à jour la recette | vrai, mais sur l'**ancienne** recette du VPS |
+| essayer sur la recette | vrai, à la même réserve |
+| lancer les mises à jour depuis le back-office | en place et éprouvé |
+
+L'ancienne recette du VPS déployait bel et bien `develop` : elle avait pris la fusion de 9h04 le
+matin même. La recette Scaleway, elle, était figée sur l'image 1.17.0 posée à la main le 12/09 et
+ne suivait rien. Et `staging.ghosteoapp.eu` pointait toujours vers le VPS, par le joker.
+
+### Ce qui a été mis en place
+
+1. **PR [#210](https://github.com/guim31/ghosteo/pull/210)** : `docker.yml` construit désormais
+   l'image à chaque fusion dans `develop`. Deux lignes — le calcul du tag n'a pas eu à changer,
+   le workflow nommait déjà l'image d'après la référence.
+2. **La recette tourne sur `ghcr.io/guim31/ghosteo:develop`** au lieu d'une version figée.
+3. **`scripts/recette-suivre-develop.py`**, cron du Beelink toutes les 5 minutes.
+4. **`staging.ghosteoapp.eu` bascule sur control-01**, enregistrement A explicite qui l'emporte
+   sur le joker, domaine déclaré et certificat délivré du premier coup (valide au 13/12/2026).
+   `staging-scw.ghosteoapp.eu` continue de répondre.
+
+### Le piège central, et pourquoi un guetteur plutôt qu'un redéploiement périodique
+
+**Le tag `:develop` est mouvant : son nom ne change pas quand son contenu change.** Or
+`docker compose up -d` ne retire pas une image déjà en cache — le journal de Dokploy montre qu'il
+ne tire qu'à la première utilisation. **Un redéploiement périodique n'aurait donc strictement
+rien fait**, en affichant des succès. Le script tire d'abord, compare l'empreinte, et ne
+redéploie que si elle a bougé.
+
+### Deux défauts de mon propre script, trouvés en l'éprouvant
+
+1. **La vérification se déclarait satisfaite avant même le redéploiement** : elle lisait l'état
+   d'avant et le trouvait conforme. Elle compare désormais aussi l'**identifiant du conteneur**,
+   qui change à la recréation.
+2. **Puis elle est devenue trop stricte** : à image inchangée, `docker compose up -d` ne recrée
+   rien, et c'est le bon comportement. Exiger la recréation faisait attendre dix minutes pour
+   rien. Les deux cas sont maintenant distingués.
+
+*Et un piège déjà consigné, dans lequel je suis retombé deux fois : un `pkill -f` ou un
+`pgrep -f` lancé depuis une commande qui contient le motif **s'attrape lui-même**. Le tour de
+passe-passe des crochets ne suffit pas si la chaîne littérale figure ailleurs dans la commande.*
+
+### Ce que cela coûte, mesuré
+
+| Mesure | Valeur |
+|---|---|
+| Fusion dans `develop` → image publiée | **1 min 44 s** (cache chaud) |
+| Fusion de livraison → image publiée | 6 min 48 s, pose du tag comprise |
+| Première construction d'une image, sans cache | 2 min 13 s |
+| Fusions dans `develop`, 90 jours | 32, soit ~11 par mois |
+
+**Environ 21 minutes d'Actions par mois**, soit 17 centimes au tarif au-delà du quota. Sur les
+222 exécutions qu'avait `ghosteo` en août, c'est une hausse de 5 %. **Ce n'est pas là qu'il faut
+chercher des économies.**
+
+**En revanche, le stockage des images mérite un coup d'œil** — et je ne peux pas le mesurer, le
+jeton n'a pas accès à l'API des paquets (403). Un tag mouvant **laisse derrière lui une version
+sans étiquette à chaque construction**, que GitHub conserve jusqu'à suppression explicite. À une
+dizaine de constructions par mois et quelques centaines de mégaoctets de couches nouvelles
+chacune, cela peut représenter un à deux gigaoctets par mois, contre 500 Mo offerts sur le plan
+gratuit. À vérifier dans *Settings → Billing → Packages* ; si le compteur grimpe, la parade est
+une étape de purge des versions sans étiquette dans `docker.yml`.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
