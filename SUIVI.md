@@ -1564,6 +1564,48 @@ Deux défauts corrigés pendant cette reprise :
 le cabinet de Guilhem, 6 pour celui de Xavier, 0 pour `ghosteo.eu` — ce qui est exact.
 
 
+#### Livraison 1.17.1 préparée le 14/09/2026, et un piège trouvé juste avant
+
+Texte et numéro validés par Guilhem. **Trois pull requests ouvertes, à fusionner dans cet ordre :**
+
+| # | Objet | Cible |
+|---|---|---|
+| [#207](https://github.com/guim31/ghosteo/pull/207) | reporter dans `develop` les correctifs urgents restés sur `main` | `develop` |
+| [#208](https://github.com/guim31/ghosteo/pull/208) | `release: v1.17.1` | `main` |
+| [#209](https://github.com/guim31/ghosteo/pull/209) | documentation de livraison remise à jour | `develop` |
+
+**Le piège, trouvé en vérifiant avant d'ouvrir la livraison.** Les deux correctifs de la chaîne
+de livraison (#193 et #202) n'avaient été fusionnés que dans `main`, jamais reportés dans
+`develop` — alors que `docs/WORKFLOW-GIT.md` dit qu'un `hotfix/*` va dans les deux. Or une pull
+request de livraison part de `develop`. Telle quelle, **elle aurait retiré 62 lignes de
+`release.yml` et `docker.yml` en arrivant dans `main`**, supprimant l'appel qui fait construire
+l'image — et la livraison serait repassée sans image, exactement le défaut qui a privé v1.16.0 et
+v1.17.0 de la leur. Le conflit sur `docker.yml` a été tranché en faveur de `main`, dont la version
+est un sur-ensemble de celle de `develop`.
+
+*Leçon : avant toute livraison, vérifier `git diff origin/main..origin/develop` et non seulement
+ce que la branche ajoute. Ce qu'une livraison RETIRE ne se voit nulle part ailleurs.*
+
+**La règle du dépôt a été respectée** : « une livraison se valide sur le CHANGELOG, jamais de sa
+propre initiative ». La section datée et le numéro ont été présentés avant d'ouvrir quoi que ce
+soit. Le numéro est un correctif — troisième chiffre — parce que la livraison ne contient aucune
+nouveauté visible.
+
+**Documentation de livraison (#209)** : elle décrivait encore un déploiement manuel site par site
+dans VitoDeploy et une recette déployée à chaque push. La section « Déploiement » est réécrite
+autour du nouveau geste — le tag publie l'image, la cascade du back-office passe les instances une
+à une, le retour arrière est la même cascade avec le tag précédent. `scripts/deploy.sh` est
+conservé mais encadré : il ne vaut plus que pour une installation hors conteneur. Les miroirs
+`.agents/` et `CLAUDE.md` suivent, comme l'exige le dépôt.
+
+Signalé et non traité : `docs/EXPLOITATION-SAUVEGARDES.md` explique comment régler nginx dans
+VitoDeploy, ce qui est sans objet sous Docker où nginx vit dans l'image — ce chapitre est à
+repenser, pas à retoucher.
+
+**Après la fusion de #208** : le tag `v1.17.1` est posé, l'image `ghcr.io/guim31/ghosteo:1.17.1`
+est publiée, et il reste à lancer la cascade depuis le back-office pour rendre définitive la
+réparation des avatars et signatures.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
