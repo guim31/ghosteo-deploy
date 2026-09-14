@@ -1697,6 +1697,56 @@ navigateur. Jeton créé à 10:19:43 UTC, valable 60 minutes.
 **À retenir** : ranger le mot de passe de recette dans le gestionnaire de mots de passe, et pour la
 prochaine fois, régénérer un lien plutôt que chercher l'ancien mot de passe.
 
+### Purge automatique des images orphelines (14/09/2026) — PR [#211](https://github.com/guim31/ghosteo/pull/211)
+
+Demandée par Guilhem après le chiffrage : le tag mouvant `:develop` laisse une image sans étiquette
+à chaque construction, que GitHub conserve et facture en stockage.
+
+**Le piège, vérifié avant d'écrire quoi que ce soit.** Chaque image publiée est un **index OCI**
+qui référence **deux manifestes sans étiquette** : l'image `linux/amd64` et l'attestation de
+provenance (`unknown/unknown`) ajoutée par défaut par `build-push-action`. GitHub les affiche comme
+des versions de paquet « untagged ». **Une purge naïve des versions sans étiquette
+(`actions/delete-package-versions`) aurait supprimé le contenu de `1.17.1`, `latest` et `develop`**,
+et cassé la mise à jour de tous les cabinets.
+
+**Retenu** : `dataaxiom/ghcr-cleanup-action`, qui raisonne en **images** et non en versions,
+épinglé sur le commit de v1.2.2 (`d52806a0…`), en dernière étape du job de construction —
+`delete-untagged`, `older-than: 2 hours` contre les constructions concurrentes, `validate`.
+
+**Vérifié de l'extérieur** — le jeton ne lit ni les journaux d'Actions ni l'API des paquets (403) —
+en relevant le registre avant et après, depuis le conteneur Dokploy de control-01, seul détenteur
+des identifiants :
+
+| Contrôle | Avant | Après la fusion de 10:24:56 UTC |
+|---|---|---|
+| index de `develop` | `a03db9b4f144` | `a48439eacc82`, publié à 10:26:10 |
+| ancien index `a03db9b4f144` | présent | **purgé** |
+| son attestation `8b08726e1eff` | présente | **purgée** |
+| son image `1ee504658a1d` | présente | **gardée** |
+| sept tags (`develop`, `latest`, `1.17.1`, `1.17.0`, `essai-1` à `3`) | 2 enfants lisibles chacun | 2 enfants lisibles chacun |
+
+**La ligne « gardée » est la meilleure preuve que l'outil est sûr** : le nouvel index de `develop`
+référence toujours ce même manifeste `linux/amd64`. L'outil l'a conservé parce qu'il est encore
+utilisé, et n'a supprimé que l'attestation, propre à chaque construction. Une purge par versions
+l'aurait effacé.
+
+**Le guetteur de la recette n'a rien recréé, et il avait raison.** La fusion ne changeait que
+`.github/workflows/docker.yml`, exclu de l'image par `.dockerignore` : image identique à l'octet
+près, même empreinte locale (`9fefc29e42c3`) que le conteneur en service. Le journal système montre
+le cron passé à 12:25, 12:30 et 12:35, muet comme prévu. **Reste à le voir recréer la recette sur une
+image réellement différente** : ce sera la prochaine fusion qui touche le code. Le mécanisme de
+recréation, lui, a déjà servi ce matin lors du passage de 1.17.0 à `develop`.
+
+**À savoir en regardant la page Packages de GitHub** : des versions « untagged » y resteront
+visibles. Ce sont les enfants des images étiquetées, qui doivent justement rester.
+
+**Deux économies de stockage possibles, non faites car irréversibles — décision de Guilhem :**
+
+1. Les images `essai-1`, `essai-2` et `essai-3` sont étiquetées, donc la purge n'y touche pas, et ne
+   servent plus depuis la 1.17.0.
+2. Le paquet du back-office `ghosteoeu-main` ne crée pas d'orphelins, mais **accumule** un tag
+   `main-<sha>` par fusion dans `main`. Une règle `keep-n-tagged` en garderait les N derniers.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
