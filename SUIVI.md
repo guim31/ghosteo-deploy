@@ -1858,6 +1858,23 @@ Scaleway **décochée**. Un redéploiement coupe chaque instance une minute envi
 il est 9h en Martinique, en pleine journée d'Aurélien MARIE-JOSEPH — le passer dans sa nuit, avant
 11h à Paris, ou accepter la coupure. Anaïs DELAUNAY est alors dans sa nuit.
 
+#### Épreuve de la mise en ligne automatique : sans objet, et c'est le bon comportement
+
+La fusion de la note du README (#67, 15:00:18) devait se mettre en ligne toute seule. **Elle ne l'a
+pas fait, à raison** : elle ne touchait que `README.md`, et le `paths-ignore` de `docker.yml`
+(`**.md`, `docs/**`) ne reconstruit pas l'image dans ce cas. Constaté : aucune image `main-b010a9c`
+au registre, `latest` toujours sur `main-b93df79`, guetteur passé à 15:02 et 15:07 sans rien faire,
+aucun verrou résiduel ni image marquée en échec.
+
+*Leçon de méthode* : une épreuve doit toucher ce qu'elle prétend éprouver. Une fusion de
+documentation ne teste pas une chaîne de mise en ligne d'image.
+
+**Ce qui est prouvé** : le chemin de mise en ligne lui-même, joué par ce même script à 14:56 ; la
+découverte de la dernière image et le silence quand rien n'a changé, à chaque passage du cron.
+**Ce qui reste à voir** : le cron déclenchant seul une mise en ligne — ce sera la prochaine fusion
+qui modifie du code dans `ghosteoeu-main`. Le README du dépôt a été corrigé pour ne plus affirmer que
+toute fusion part en production.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
