@@ -1803,6 +1803,61 @@ JS (#206) ; tickets de facturation électronique du back-office, dont le #2 port
 01/09/2026 ; points déjà notés — résolveur DNS du Beelink, #203 cache PHP, en-tête HSTS en double,
 page 419 sans issue, `docs/EXPLOITATION-SAUVEGARDES.md` périmé.
 
+### 14/09/2026 après-midi : ghosteo.eu se met en ligne tout seul, fiche fantôme retirée
+
+**Réponses de Guilhem à l'état des lieux.** Alexia GAUTHIER et Cédric ROUSSEAU sont prévenus et
+confirment : sujet clos. TTL de `ghosteo.eu` et `www` remis sur « par défaut » chez OVH — mais le
+serveur qui fait autorité répond **toujours 60 s** après publication de la zone : dans cette zone,
+« par défaut » ne vaut pas 3 600. À saisir explicitement, sans urgence. Étape 5 reportée : **rappel
+créé dans l'agenda Google de Guilhem, jeudi 17/09/2026 à 12h30**, avec la liste des cinq clés et
+ce qu'il faut avoir sous la main.
+
+**Réglage `deploy_image` passé en 1.17.1** : un client créé demain reçoit la version corrigée.
+
+#### ghosteo.eu a de nouveau une mise en ligne, et elle est automatique
+
+Le trou constaté le matin : une fusion dans `main` de `ghosteoeu-main` publiait une image que rien ne
+déployait. **Règle désormais en vigueur : fusionner dans `main`, c'est mettre en ligne**, dans les
+cinq minutes — ce qui était déjà la convention écrite du dépôt. Outil :
+`scripts/backoffice-suivre-main.py`, cron du Beelink `2-59/5`.
+
+Trois filets, parce que c'est le serveur de licences :
+
+1. **copie de la base avant chaque mise en ligne**, sur control-01, dans
+   `/root/backoffice-avant-deploiement/`, dix gardées — c'est elle, pas l'image, qui défait une migration ;
+2. **vérification réelle** : conteneur recréé, sur la bonne image, sain, `/up` et `/login` à 200 en
+   visant l'adresse du serveur ;
+3. **retour automatique à l'image précédente** en cas d'échec sous dix minutes, et l'image en échec
+   n'est **plus retentée d'elle-même** — sans ce verrou, le cron rejouerait la même mise en ligne
+   ratée toutes les cinq minutes, copie de base et coupure comprises.
+
+**Première mise en ligne par l'outil**, déclenchée à la main : `main-93a0907` → `main-b93df79`
+(corrections de facturation #65 et #66), de 14:56:30 à 14:57:30. Copie de base de 639 510 octets.
+Contrôles : les trois rôles sur la nouvelle image, migration `2026_09_14_090000` jouée, aucune en
+attente, route des licences à 422 vue de l'extérieur, planificateur reparti sans erreur.
+
+La règle est écrite dans le README de `ghosteoeu-main`, pour qui fusionne dans `main`, humain ou agent.
+
+#### Fiche de recette fantôme retirée du moniteur
+
+La fiche #7 « Staging DEVELOP » (`staging.ghosteoapp.eu`, site Vito 32 de l'ancien VPS) était en panne
+depuis la bascule de ce nom sur control-01. Supprimée avec garde-fous : adresse vérifiée, aucun
+service Dokploy ni serveur rattaché, aucun observateur sur le modèle. Partent avec elle **6 857
+contrôles et 1 incident** d'historique ; **la licence #10 est conservée** ; la base d'avant est dans
+la copie de 14:56. La cascade propose désormais **neuf** instances, toutes en service.
+
+**Piège qui demeure** : la recette Scaleway reste proposée à la cascade, puisqu'elle est suivie par le
+moniteur. **Elle doit être décochée à chaque mise à jour du parc** : la passer sur une version
+figée la ferait cesser de suivre `develop`. Amélioration possible plus tard : écarter d'office de la
+cascade toute instance dont l'image n'est pas une version.
+
+#### Cascade vers 1.17.1 : à lancer par Guilhem
+
+Ordre recommandé : son propre cabinet seul, vérification de sa signature, puis les autres. Recette
+Scaleway **décochée**. Un redéploiement coupe chaque instance une minute environ : à 15h à Paris,
+il est 9h en Martinique, en pleine journée d'Aurélien MARIE-JOSEPH — le passer dans sa nuit, avant
+11h à Paris, ou accepter la coupure. Anaïs DELAUNAY est alors dans sa nuit.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
