@@ -1675,6 +1675,28 @@ chacune, cela peut représenter un à deux gigaoctets par mois, contre 500 Mo of
 gratuit. À vérifier dans *Settings → Billing → Packages* ; si le compteur grimpe, la parade est
 une étape de purge des versions sans étiquette dans `docker.yml`.
 
+### Connexion refusée sur la recette (14/09/2026, 10h40 UTC)
+
+Guilhem ne pouvait plus se connecter à `staging.ghosteoapp.eu` avec `utilisateur2@example.invalid`.
+
+**Le serveur n'y est pour rien.** Le compte existe et est actif ; les quatre essais du matin
+(depuis `82.67.44.154`) ont tous reçu la réponse standard d'identifiants incorrects, un 302 vers
+`/login`. Aucune ligne du code d'authentification n'a changé depuis 1.17.0, donc pas de régression
+liée au passage de la recette sur `:develop`.
+
+**La cause** : le mot de passe des comptes de recette a été **tiré au hasard** par
+`db:anonymize` le 10/09 (`Str::password(16)`), communiqué ce jour-là et conservé nulle part. Et
+jusqu'à ce matin, `staging.ghosteoapp.eu` menait à l'**ancienne** recette du VPS, qui a d'autres
+comptes : la confusion était facile.
+
+**La parade, sans faire transiter de mot de passe** : un jeton de réinitialisation à usage unique,
+créé directement par le broker de mots de passe de Laravel — le courrier ne partirait pas vers
+`example.invalid` — et remis à Guilhem sous forme de lien. Il choisit son mot de passe dans le
+navigateur. Jeton créé à 10:19:43 UTC, valable 60 minutes.
+
+**À retenir** : ranger le mot de passe de recette dans le gestionnaire de mots de passe, et pour la
+prochaine fois, régénérer un lien plutôt que chercher l'ancien mot de passe.
+
 ## Notes
 
 - 10/09/2026 : **clé SSH sur les images Scaleway** — la section `users:` du cloud-init n'a
