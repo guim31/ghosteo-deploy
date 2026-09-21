@@ -1787,10 +1787,10 @@ consultations, Adrien BLACHON +11, Guilhem HENRY +9, Xavier PAGES +3, Aurélien 
 | 2 | `deploy_image` → 1.17.1 | agent ou Guilhem | juste après |
 | 3 | Déployer le back-office sur `main-b93df79`, et outiller ce geste | décision de Guilhem | dès que possible |
 | 4 | Nettoyer le moniteur : fiche #7 | agent | dès que possible |
-| 5 | Étape 5 : révoquer et recréer les clés — Scaleway `beelink-migration`, jeton Dokploy, jeton de l'agent de métriques, clé `backoffice-dns`, secret de webhook Stripe | ensemble | quand Guilhem veut |
+| 5 | Étape 5 : révoquer et recréer les clés — Scaleway `beelink-migration`, jeton Dokploy, jeton de l'agent de métriques, clé `backoffice-dns`, secret de webhook Stripe, **clé Stripe `sk_test_` collée dans un salon le 21/09** | ensemble | quand Guilhem veut |
 | 6 | Confirmations d'Alexia GAUTHIER et Cédric ROUSSEAU | Guilhem | avant le 13/10 |
 | 7 | TTL de `ghosteo.eu` et `www` de 60 à 3 600 s, chez OVH | Guilhem | cette semaine |
-| 8 | Zone `ghosteoapp.eu` : `@`, joker, `www`, `panel` pointent encore vers le VPS ; `test-migration` est un vestige | ensemble | le 13/10 |
+| 8 | Zone `ghosteoapp.eu` : `@`, `www`, `panel` pointent encore vers le VPS ; `test-migration` est un vestige. **Le joker est supprimé le 21/09** (voir la section du 21/09) | ensemble | le 13/10 |
 | 9 | Résilier le VPS, puis retirer le cron `backup-vps.sh` | Guilhem puis agent | à partir du 13/10 (effet au 23/10) |
 
 **Décisions en attente, non urgentes** : supprimer les images `essai-1` à `3` ; garder seulement les
@@ -1874,6 +1874,314 @@ découverte de la dernière image et le silence quand rien n'a changé, à chaqu
 **Ce qui reste à voir** : le cron déclenchant seul une mise en ligne — ce sera la prochaine fusion
 qui modifie du code dans `ghosteoeu-main`. Le README du dépôt a été corrigé pour ne plus affirmer que
 toute fusion part en production.
+
+### 14/09/2026, 17h : planificateur et file du back-office contrôlés — rien à corriger
+
+Objectif : exclure la panne silencieuse (tâches déclarées mais jamais exécutées, courriers restés en
+table `jobs`). **Constat : les deux rôles tournent, aucune modification n'a été nécessaire.**
+
+- **Conteneurs** du service `ghosteo-backoffice-w33xq9` : `scheduler` (`schedule:work`) et `queue`
+  (`queue:work --tries=3 --sleep=3 --max-time=3600`), tous deux sur `main-b93df79`,
+  `AUTORUN_ENABLED=false`, même `.env` et même volume `storage` que `web`, `restart: unless-stopped`.
+  Les redémarrages du conteneur `queue` (2 en 2 h) sont les sorties voulues de `--max-time=3600`.
+- **Un seul planificateur du back-office.** Les deux autres `schedule:work` de control-01 sont ceux de
+  la recette. Sur le VPS, la crontab de `ghosteoserver` appelle **toujours** `schedule:run` chaque
+  minute, mais l'application est en maintenance (`storage/framework/down`) : dernier `InstanceCheck`
+  côté VPS le 13/09 à 12:45. **Un `artisan up` sur le VPS relancerait un second planificateur sur
+  une base périmée** : retirer cette ligne de crontab à la résiliation (ou avant).
+- **`schedule:list`** : les six tâches. Fuseau **Europe/Paris** (`APP_TIMEZONE` est défini dans
+  l'environnement de production) : `subscription:check-expiry` part donc bien à 9 h, heure de Paris.
+- **Sonde du planificateur** : `InstanceCheck::max` à 17:00:10 (lu à 17:04), puis **17:15:08 (lu à
+  17:16)**, 20 lignes entre 17:06 et 17:16, `instances:check` DONE à 17:05, 17:10 et 17:15 ;
+  journal du `scheduler` sans aucun échec.
+- **Sonde de la file** : `jobs` à 0. Une tâche de test envoyée à 17:05:23 a été prise **en moins
+  d'une seconde**. *Piège* : une closure écrite dans `tinker --execute` ne se désérialise pas
+  (« eval()'d code »), la tâche a échoué trois fois et laissé la ligne **`failed_jobs` #6**
+  (`03ff18eb-20a3-4403-84be-c213644cec6e`). Suppression refusée par le garde-fou de permissions, donc
+  à faire par `php artisan queue:forget 03ff18eb-20a3-4403-84be-c213644cec6e`. Pour une prochaine sonde,
+  utiliser une classe de job existante, pas une closure.
+
+**Les cinq échecs anciens de `failed_jobs`**, tous hérités du VPS :
+
+| # | Date | Tâche | Cause | Encore d'actualité ? |
+|---|---|---|---|---|
+| 1 | 12/10/2025 | `SendPlanUpdateToClient` → instance de Guilhem, offre `vip-lifetime` | secret du webhook client non configuré | non, interne |
+| 2, 3 | 15/10/2025 | `SendServiceReadyEmail`, compte #6 | mauvais type d'événement | non : compte supprimé, écouteur retiré du code |
+| 4 | 31/01/2026 | `SendOrderConfirmation`, **Aurélien MARIE-JOSEPH**, Formule VIP | `App\Mail\Mailable` introuvable | **confirmation de commande jamais partie** ; rien dans `email_logs` |
+| 5 | 06/05/2026 | `SendOrderConfirmation`, **Alexia GAUTHIER**, Essentiel annuel | idem | confirmation jamais partie ; elle a en revanche reçu « Votre logiciel est prêt » le 17/06/2026 |
+
+La cause de #4 et #5 est corrigée sur `main` (`use Illuminate\Mail\Mailable`). Décision de Guilhem :
+renvoyer ou non ces deux confirmations, puis vider les lignes par `queue:forget` (ne pas faire
+`queue:retry` sans le décider : les courriers partiraient avec des mois de retard).
+
+### 14/09/2026 soir : incohérences d'affichage du back-office
+
+Quatre constats de Guilhem (démo « 1.17.1 annonce 1.17.0 », « Staging DEVELOP » hors ligne,
+renommage `staging-scw` → `staging` inachevé, écran *Mises à jour* tout en 1.17.0). Relevé réel :
+
+| Fiche | URL | Licence | Image | Annonce | État |
+|---|---|---|---|---|---|
+| #2 Demo | demo | #2 | 1.17.1 | 1.17.0 (ping 08:00) | en ligne |
+| #10 Staging SCALEWAY | `staging-scw` | #13, domaine `staging-scw` | `develop` | 1.17.0 | en ligne |
+| #11 Staging DEVELOP | `staging` | #10, domaine `staging`, dernier ping 11/09 | — | 1.17.0 | **fiche fantôme recréée** (la #7 supprimée à 14:56) |
+
+`/health` de `staging` et de `staging-scw` répondent tous deux `staging-scw` : la recette garde
+`APP_URL` et `INTERNAL_CALLBACK_URL` en `staging-scw`. Dokploy porte déjà les **deux** domaines.
+
+**Code, deux pull requests ouvertes, non fusionnées :**
+
+- **ghosteoeu-main [#70](https://github.com/guim31/ghosteoeu-main/pull/70)** — l'écran de cascade lit
+  la version effective comme le moniteur ; une image de branche (`develop`) n'est plus comparée,
+  sort du compteur et est **décochée d'office** dans la cascade ; motif de panne affiché sous
+  « Hors ligne » ; **une licence suspendue ne recrée plus sa fiche**. Banc NAS : Pint, PHPStan,
+  446 tests verts.
+- **ghosteo [#213](https://github.com/guim31/ghosteo/pull/213)** (vers `develop`) — tâche planifiée
+  toutes les 10 min qui revalide la licence **seulement si la version installée a changé** : fin du
+  décalage « annonce » jusqu'au lendemain 8 h. Effet à la prochaine livraison.
+
+**Piège trouvé dans le plan de renommage** : `Api\LicenseController::verify` rejette en 403
+`domain_mismatch` si l'hôte de `INTERNAL_CALLBACK_URL` diffère de `domain_allowed`. Passer la recette
+en `staging` sans modifier **d'abord** le domaine de la licence #13 bloquerait la recette à
+l'expiration de son cache. Les deux gestes vont ensemble.
+
+**Fait le 14/09/2026 au soir.** #213 fusionnée 18:54 UTC, #70 18:55 ; ghosteo.eu en ligne sur
+`main-68139c1` à 19:04 (copie de base `20260914-190311-avant-main-68139c1.sql.gz`). La recette a pris
+`:develop` à 19:01 et **a revalidé sa licence à 19:10** : première preuve de #213 en réel. Signature
+`2_signature_1788960385.png` recopiée du VPS (empreinte identique). Licence #10 suspendue, fiche #11
+« Non suivie » (conservée : pas de suppression possible depuis l'interface), licence #13 et fiche #10
+(« Recette (develop) ») passées en `staging`, par Guilhem dans le back-office. `APP_URL` et
+`INTERNAL_CALLBACK_URL` changés et recette redéployée par Guilhem dans Dokploy à 22:04. Vérifié :
+`/health` répond `staging.ghosteoapp.eu` sur les deux noms, `/login` 200, fiche #10 en ligne à 22:05.
+La licence de la recette se revalidera sous le nouveau nom à l'expiration de son cache, vers 07:10 le
+15/09 : `last_verified_url` de la licence #13 doit alors valoir `https://staging.ghosteoapp.eu`.
+
+*Garde-fou du mode automatique* : malgré des règles `allow` ajoutées par Guilhem, il a refusé la
+fusion (chemin `~/.local/bin/gh` au lieu du chemin complet de la règle), `tinker` avec code en
+ligne, l'écriture de scripts destinés au serveur, et `compose.deploy` (« Production Deploy »). Seul
+le dépôt de fichier par `docker exec -i … < fichier` est passé. Les gestes en production sur
+GHosteo passent donc par Guilhem, dans le back-office ou Dokploy.
+
+**Plan initial (pour mémoire) :**
+
+1. Licence #13 : domaine → `staging.ghosteoapp.eu` ; recette : `APP_URL` et `INTERNAL_CALLBACK_URL`
+   → `https://staging.ghosteoapp.eu`, redéploiement ; fiche #10 : URL `staging`, nom « Recette (develop) ».
+   Garder le domaine `staging-scw` dans Dokploy quelque temps (liens en favori).
+2. Licence #10 (ancienne recette VPS) : **suspendre** — vérifié, la mise à jour d'une licence
+   n'envoie aucun webhook. Fiche #11 : décocher « surveillance » tout de suite ; la supprimer une
+   fois #70 en ligne.
+3. Images de la recette : sur 4 fichiers référencés, **un seul est récupérable** —
+   `2_signature_1788960385.png` existe dans `/home/staging/staging.ghosteoapp.eu/public/signature/`
+   du VPS. `2_avatar_1789060888.jpg` a été téléversé après la migration (le VPS n'a que
+   `2_avatar_1788959282.jpg`), les signatures des comptes 9 et 32 n'y sont pas : à refaire depuis
+   l'application. Destination : `storage/app/public-assets/signature/` du volume de la recette.
+
+## Libre-service ouvert : essai, étudiants, jeune diplômé, fin de vie (21/09/2026)
+
+Les cinq lots écrits par une session précédente (PR #83 à #87 sur `ghosteoeu-main`, empilées)
+ont été fusionnés dans l'ordre, puis configurés côté Stripe et Scaleway. `main-f81d335` est en
+ligne depuis 22h34, sain, **les 15 migrations jouées** (lot 24). La pile était propre : chaque PR
+contenait `main` et la précédente, aucun rebase nécessaire.
+
+### Stripe
+
+- **Coupons du tarif jeune diplômé créés par la commande prévue**, `php artisan
+  stripe:create-young-grad-coupons`, dans le conteneur `ghosteo-backoffice-w33xq9-web-1` :
+  `ZMyY4TLX` (−10 € pendant 12 mois, PRO mensuel 19 € → 9 €) et `YNsXAK1u` (−100 € une fois,
+  PRO annuel 199 € → 99 €). Les identifiants sont enregistrés sous `young_grad_coupon_monthly`
+  et `young_grad_coupon_yearly` ; la commande rejouée répond « déjà en place », et
+  `YoungGradSettings::couponFor()` les résout bien sur `pro` et `pro-yearly`.
+- **Webhook de production complété** : `customer.subscription.trial_will_end` ajouté à
+  `we_1SDATdGv72oAlivyKW9E76tZ` (`https://www.ghosteo.eu/stripe/webhook`), qui passe de 8 à 9
+  événements. Le secret de signature ne change pas quand on modifie la liste : rien à
+  redéployer. Sans cet événement, l'e-mail « votre essai se termine dans 3 jours » ne part
+  jamais et les clients sont prélevés sans avertissement.
+- **E-mail automatique de Stripe désactivé** par Guilhem (Paramètres → Facturation →
+  Abonnements et e-mails → décocher le rappel de fin d'essai). À savoir : le rappel de Stripe
+  part **7 jours** avant la fin, le nôtre 3 jours — les deux messages n'auraient pas été le
+  même jour, mais à J+23 et J+27.
+
+**Piège majeur, à connaître avant tout travail en mode test.** Le mode test de GHosteo n'est
+pas le sandbox du compte de production : c'est un **compte Stripe séparé**.
+
+| | compte | visible par le connecteur Stripe de l'agent |
+|---|---|---|
+| production | `acct_1RbhqoGv72oAlivy` — « GHosteo » | oui |
+| test | `acct_1Rbhqy2eGMO58kd5` — « Environnement de test GHosteo » | **non** |
+
+Le connecteur ne liste que des comptes `livemode: true` ; un appel en `livemode: false` échoue
+sur `No account found for the provided stripe_context and livemode`. Le mode test ne s'atteint
+donc qu'avec une clé `sk_test_` et curl. **Conséquence qui bloque le parcours de bout en bout** :
+la production valide la signature des webhooks avec son secret *live*, donc un événement émis
+par le compte de test y est rejeté en signature, quels que soient les événements activés sur
+l'endpoint de test. Voir « Ce qui reste » ci-dessous.
+
+L'endpoint `we_1SHfe82eGMO58kd5r5tzmhAE` du compte de test est un vestige : il pointe vers la
+production et n'écoute que `product.*` / `price.*`. Laissé en place, il ne sert à rien.
+
+### DNS : le joker supprimé
+
+`*.ghosteoapp.eu A 51.178.87.41` (l'ancien VPS OVH, ttl 60) a été supprimé, en avance sur le
+nettoyage prévu au 13/10. **Ce n'était pas cosmétique** : l'application pose un enregistrement A
+par cabinet, et le joker faisait répondre *quand même* le sous-domaine d'un cabinet dont la
+création DNS aurait échoué — le prospect serait tombé sur l'ancien VPS au lieu d'une erreur
+franche, sans que personne ne le voie. Contrôles avant suppression : l'export OVH ne contenait
+aucun A par cabinet (c'est bien le joker qui les servait tous avant la migration), et les huit
+cabinets de `clients.yaml` ont désormais leur A explicite vers worker-01. Après : 23
+enregistrements au lieu de 24, seul le joker disparu, les cabinets résolvent, un sous-domaine
+inconnu ne répond plus rien.
+
+### Jeton Scaleway DNS : rien à faire, c'était déjà fait
+
+Demande initiale : créer une application IAM avec `DomainsDNSFullAccess`. **C'était déjà en
+place depuis le 11/09** (application `backoffice-dns`, voir phase 4) : `scaleway_dns_token` est
+présent dans les réglages et `dns_provider` vaut `scaleway`. Une seconde clé avait été créée
+pour rien, supprimée depuis. **À retenir : la clé expire le 11/09/2027**, et ce jour-là la
+création de cabinets cessera silencieusement.
+
+La clé d'API du Beelink, elle, n'a **aucun droit IAM** : `permission-sets`, `applications` et
+`api-keys` répondent tous `permissions_denied`. Elle ne peut donc pas fabriquer de jeton — un
+nouveau se crée à la console, par Guilhem. C'est le bon réglage, à ne pas élargir.
+
+### `worker-02`, serveur des essais et des licences étudiantes
+
+Créé le 21/09/2026 par `create-server.py`. Scaleway **DEV1-M** fr-par-1 (3 vCPU, 4 Go,
+14,74 € HT/mois), serveur `6517e855-3fea-426c-be61-d852e23cbcbf`, **IP fixe
+`163.172.164.143`**, réseau privé `ghosteo-interne` en `172.31.40.4/22` (control-01 `.2`,
+worker-01 `.3`). Groupe de sécurité `ghosteo-worker` réutilisé : 22 ouvert seulement depuis
+control-01 et la maison, 80/443 publics. Cloud-init `worker.yaml` : swap 2 Go, ufw, fail2ban,
+pas de Docker. Alias SSH `worker-02` sur le Beelink.
+
+Attaché à Dokploy par API (`server.create` puis `server.setup`, ~6 min) : serveur
+`4CYORDO8oRw05lNQw0Q5V`, clé SSH `ghosteo-workers` (`-jg8rdKLAHDliUS2mJsQe`, la même que
+worker-01, récupérée depuis les tags `AUTHORIZED_KEY` de worker-01 faute de l'avoir conservée),
+Docker 28.5.0, swarm actif, `dokploy-network`, Traefik 3.6.25. `server.create` exige
+`serverType: "deploy"`, absent de la documentation et signalé par un `zodError`.
+
+**Pourquoi un serveur dédié plutôt que worker-01** : worker-01 n'a que 4 places libres sur 12,
+1,99 Go de RAM disponible sur 3,9 et 26 conteneurs pour 8 cabinets — de quoi tenir quelques
+essais, pas vingt. Et le cycle de vie éteint puis *supprime* des instances : le faire sur la
+machine des cabinets payants n'est pas une bonne idée.
+
+**Deux pièges rencontrés, le second inédit :**
+
+1. **Adresse Let's Encrypt, troisième occurrence.** `server.setup` laisse
+   `email: test@localhost.com` dans `/etc/dokploy/traefik/traefik.yml`. Corrigé en
+   `guilhemhenry@gmail.com`, sauvegarde `traefik.yml.bak-20260921`, Traefik redémarré. Ce piège
+   s'est produit sur control-01, worker-01 **et** worker-02 : le supposer à chaque nouveau
+   serveur.
+2. **Nom d'hôte figé dans le gabarit.** `cloud-init/worker.yaml` portait `hostname: worker-01`
+   en dur : worker-02 a démarré sous le nom de son aîné et s'est enregistré ainsi dans son
+   swarm. Rien n'était cassé — les deux workers ont des swarms séparés, IP et réseau privé
+   justes — mais deux machines portaient le même nom, ce qui rend les journaux et les relevés
+   du moniteur indéchiffrables dès qu'on les croise. Réparé sur la machine
+   (`hostnamectl set-hostname worker-02`, `/etc/hosts`, `systemctl restart docker` — le nœud
+   swarm se réenregistre alors sous le bon nom). **Corrigé à la source** :
+   `create-server.py` reçoit désormais le nom du serveur et réécrit la ligne `hostname:` du
+   gabarit avant de l'injecter ; `final_message` ne nomme plus worker-01.
+
+### Réglages du back-office et contrôles
+
+Posés par Guilhem dans l'interface — le garde-fou du mode automatique refuse les écritures en
+production par `docker exec … php artisan tinker` (« Remote Shell Writes »), alors que les
+lectures passent. Ne pas demander de règles `allow` : donner les valeurs, puis vérifier.
+
+| Réglage | Valeur |
+|---|---|
+| Serveur #3 `worker-02` | `purpose = trial`, `backend = dokploy`, actif, IP `163.172.164.143`, `external_id = 4CYORDO8oRw05lNQw0Q5V`, capacité 12, 4 096 Mo |
+| `trial_max_instances` | 8 |
+| `student_max_instances` | 4 |
+| `dns_provider` | `scaleway` |
+| `deploy_base_domain` | vide — sans effet, `Subdomain::DEFAULT_BASE_DOMAIN` vaut `ghosteoapp.eu` |
+| Code étudiant | `ITO-2026`, ITO Labège, « Promo 2026 - 5ème année », 0/10 |
+
+Les plafonds sont calés sur la capacité réelle : 8 + 4 = 12, la capacité de worker-02. Au-delà,
+c'est le serveur qui commanderait et `alertAdminOfFullCapacity()` enverrait le Telegram
+« ⚠️ Libre-service : plafond atteint » — `TelegramService::isConfigured()` répond bien `oui`.
+Une inscription qui ne trouve pas de place n'est donc pas silencieuse, mais l'alerte arrive
+après coup, le prospect déjà en attente.
+
+**Contrôles en lecture, tout vert :**
+
+```
+availableServer()      = #3 worker-02 (163.172.164.143), 12 places
+hasRoomFor(trial)      = oui (8 places)
+hasRoomFor(student)    = oui (4 places)
+lifecycle:run --dry-run = « Rien à faire aujourd'hui »
+GET /etudiants/inscription?code=ITO-2026 = 200
+GET /stripe/webhook    = 405 (POST seulement : la route existe)
+```
+
+La simulation du cycle de vie est vide, et c'est le résultat attendu : la migration donne
+`kind = 'paid'` par défaut à toutes les licences existantes, et les cinq transitions ne
+regardent que `trial` et `student`. Le planificateur de 06:00 pouvait donc démarrer dès la mise
+en ligne sans qu'on ait encore lu la simulation.
+
+**Piège du code étudiant, à sa création** : le premier code ITO avait une échéance au
+`2026-08-01`, sept semaines dans le passé. `is_active` valait `true` et il restait 10 usages,
+mais `isUsable()` répondait `NON` et le statut affiché était « Expiré » — l'inscription aurait
+été refusée sans que rien ne semble anormal sur la fiche. Corrigé au `2027-08-01`. **Vérifier
+`isUsable()`, pas `is_active`.**
+
+### Deux défauts trouvés en répétant le parcours, le soir même
+
+La répétition de l'inscription — faite en vrai, l'essai étant gratuit trente jours — a
+révélé deux choses qu'aucun test ne couvrait.
+
+**1. Un cabinet en service pouvait être revendiqué par un inconnu (PR #88, en ligne).**
+`Subdomain::isTaken()` ne consultait que `licenses.domain_allowed` et
+`site_deployments.domain`. Or les licences héritées de la migration ont ce champ vide, et
+l'inventaire réel des cabinets est la table `instances`, jamais regardée. Deux cabinets
+étaient donc annoncés libres : `guilhem-henry` et **`aurelien-marie-joseph`, qui appartient
+à un client payant**.
+
+Ce n'était pas qu'un message d'aide trompeur : `TrialRegisterRequest` et
+`StudentRegisterRequest` valident par le *même* `rejectionReason()`, donc le formulaire
+acceptait la saisie ; et `ScalewayDnsProvider` écrit l'enregistrement A avec `'set'`, qui
+**remplace**. Une inscription à l'essai gratuit avec ce nom aurait fait basculer le
+sous-domaine du client de worker-01 vers worker-02 et rendu son cabinet injoignable, ses
+visiteurs atterrissant chez l'inconnu. `isTaken()` consulte désormais aussi les instances ;
+le domaine s'y lit dans `url`, la table n'ayant pas de colonne dédiée, donc un `LIKE`
+dégrossit et une comparaison d'hôte tranche. Vérifié en production après mise en ligne :
+les deux noms répondent « déjà utilisé », y compris par l'API publique.
+
+**Leçon de méthode** : le correctif a été trouvé parce que la répétition a été faite *en
+vrai*. Aucun des 684 tests ne le voyait, faute de données héritées dans le jeu d'essai.
+
+**2. Un code étudiant réel était affiché en exemple (PR #89).**
+`register_student.blade.php` portait `placeholder="ITO-2026"` en dur, écrit avant que ce
+code existe. Il existe désormais, il est actif et il a dix places : la page publique
+l'offrait en exemple grisé à tout visiteur. Devenu `XXXX-0000`, avec un test qui l'interdit.
+
+La même PR corrige deux remarques de Guilhem sur `/etudiants` : l'en-tête, qui était écrit
+en dur dans `welcome.blade.php` et que chaque autre page remplaçait par un bandeau réduit
+(il devient le partial `layouts/partials/_navbar`), et l'habillage de la page, qui passe de
+5 à 13 icônes. Le discours assume enfin que **le code ne vient pas toujours d'une école** :
+Guilhem en distribue aussi en message privé sur Instagram.
+
+**Piège du banc de test du NAS** : PHPStan y échoue sur « Allowed memory size of 268435456
+bytes exhausted » — la limite du conteneur, pas une erreur d'analyse. Le lancer avec
+`-e PHP_MEMORY_LIMIT=2G` et `php -d memory_limit=2G` pour obtenir un vrai verdict.
+
+### Ce qui reste de ce chantier
+
+1. **La répétition du parcours reste à terminer** : interrompue à la découverte du défaut
+   ci-dessus, à reprendre une fois #89 fusionnée. Rappel : la carte utilisée sera retenue
+   par `trial_card_fingerprints` et ne pourra plus ouvrir d'autre essai, sans écran
+   d'administration pour l'effacer.
+2. **Le parcours d'achat de bout en bout en mode test (« D3 ») n'est pas faisable en l'état.**
+   Il demande une instance du back-office qui tourne avec les clés du compte de test, pour que
+   les webhooks signés en test soient acceptés ; elle n'existe pas (control-01 héberge le
+   back-office de production et la recette de l'*application cliente*, pas du back-office).
+   C'est ce qui permettrait de voir J+27 et J+30 à l'horloge de test de Stripe.
+3. **PR #89 à fusionner** : page étudiante, en-tête partagé et `placeholder` du code. Tant
+   qu'elle ne l'est pas, la page publique montre toujours `ITO-2026` en exemple.
+4. **Expiration de la clé `backoffice-dns` au 11/09/2027.**
+
+### Coût
+
+Le parc passe de 29,48 € à **44,22 € HT/mois** (control-01 14,74 + worker-01 14,74 +
+worker-02 14,74).
+
 
 ## Notes
 

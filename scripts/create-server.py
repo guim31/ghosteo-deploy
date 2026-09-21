@@ -31,6 +31,7 @@ d'API est lue par scw.py dans ~/.config/scw/config.yaml.
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.request
@@ -158,10 +159,22 @@ def find_server(project, name):
     return None
 
 
-def put_user_data(server_id, cloud_init_path):
+def put_user_data(server_id, cloud_init_path, name=None):
+    """Injecte le cloud-init, en y mettant le nom réel de la machine.
+
+    Le gabarit porte un `hostname:` d'exemple. Sans cette substitution, worker-02
+    a démarré sous le nom `worker-01` (21/09/2026) : même nom d'hôte sur deux
+    machines, nœud swarm mal étiqueté, et journaux indéchiffrables.
+    """
     cfg = load_config()
     with open(cloud_init_path, "rb") as fh:
         data = fh.read()
+    if name:
+        data, remplace = re.subn(
+            rb"(?m)^hostname:[ \t]*\S+[ \t]*$", b"hostname: " + name.encode(), data
+        )
+        if remplace:
+            print(f"cloud-init : hostname forcé à {name}")
     req = urllib.request.Request(
         f"https://api.scaleway.com{BASE}/servers/{server_id}/user_data/cloud-init",
         data=data,
@@ -260,7 +273,7 @@ def main():
         )
         server = ok(status, payload, "création du serveur")["server"]
         print(f"serveur {args.name} créé : {server['id']}")
-        put_user_data(server["id"], args.cloud_init)
+        put_user_data(server["id"], args.cloud_init, args.name)
         status, payload = call("POST", f"{BASE}/servers/{server['id']}/action", {"action": "poweron"})
         ok(status, payload, "démarrage")
         print("démarrage demandé")

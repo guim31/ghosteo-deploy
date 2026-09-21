@@ -97,4 +97,4 @@ runcmd:
   - ufw --force enable
   - touch /var/lib/cloud/ghosteo-worker-ready
 
-final_message: "worker-01 prêt après $UPTIME s (cloud-init $VERSION)"
+final_message: "serveur de clients prêt après $UPTIME s (cloud-init $VERSION)"
