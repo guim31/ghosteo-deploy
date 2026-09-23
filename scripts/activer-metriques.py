@@ -19,6 +19,13 @@ Usage :
   activer-metriques.py worker-02 --verifier      vérifie seulement (aucune écriture)
 
 Rejouable : appeler setupMonitoring sur un agent déjà actif le reconfigure à l'identique.
+control-01 est le serveur du panneau : son agent se règle par admin.setupMonitoring, pas par
+server.setupMonitoring, et il n'apparaît pas dans server.all.
+
+Relevé toutes les 15 s, et non 60 : un agent relève le processeur à l'instant, toujours à la
+même seconde de la minute. Celui de control-01 tombait au réveil du planificateur Laravel et
+affichait 85 % pour une machine inactive à 95 % (23/09/2026). À 15 s, quatre instants par
+minute, que le moniteur moyenne sur cinq minutes.
 """
 import argparse
 import os
@@ -32,6 +39,7 @@ from dokploy import call as dokploy          # noqa: E402
 
 JETON = os.path.expanduser("~/.config/dokploy/metrics.token")
 PORT = 4500
+PANNEAU = "control-01"
 BACKOFFICE = "ghosteo-backoffice-w33xq9-web-1"          # sur control-01
 
 
@@ -41,6 +49,11 @@ def die(message):
 
 
 def serveur_dokploy(nom):
+    if nom == PANNEAU:
+        status, reglages = dokploy("GET", "settings.getWebServerSettings")
+        if status != 200:
+            die(f"settings.getWebServerSettings a répondu {status}")
+        return {"serverId": None, "metricsConfig": reglages.get("metricsConfig")}
     status, serveurs = dokploy("GET", "server.all")
     if status != 200:
         die(f"server.all a répondu {status}")
@@ -72,7 +85,7 @@ def configuration(jeton):
     url = open(os.path.expanduser("~/.config/dokploy/url")).read().strip()
     return {
         "server": {
-            "refreshRate": 60,
+            "refreshRate": 15,
             "port": PORT,
             "token": jeton,
             "urlCallback": url.rstrip("/") + "/",
@@ -113,13 +126,18 @@ def main():
     serveur = serveur_dokploy(args.nom)
     ip = adresse_privee(args.nom)
     actif = bool((serveur.get("metricsConfig") or {}).get("server", {}).get("token"))
-    print(f"{args.nom} : Dokploy {serveur['serverId']}, adresse privée {ip}, agent {'configuré' if actif else 'non configuré'}")
+    rythme = (serveur.get("metricsConfig") or {}).get("server", {}).get("refreshRate")
+    print(f"{args.nom} : Dokploy {serveur['serverId'] or 'panneau'}, adresse privée {ip}, "
+          f"agent {'configuré' if actif else 'non configuré'}" + (f", relevé toutes les {rythme} s" if actif else ""))
 
     if not args.verifier:
-        status, reponse = dokploy("POST", "server.setupMonitoring",
-                                  {"serverId": serveur["serverId"], "metricsConfig": configuration(jeton)})
+        if serveur["serverId"] is None:
+            route, corps = "admin.setupMonitoring", {"metricsConfig": configuration(jeton)}
+        else:
+            route, corps = "server.setupMonitoring", {"serverId": serveur["serverId"], "metricsConfig": configuration(jeton)}
+        status, reponse = dokploy("POST", route, corps)
         if status != 200:
-            die(f"server.setupMonitoring a répondu {status} : {reponse}")
+            die(f"{route} a répondu {status} : {reponse}")
         print("Agent configuré par Dokploy ; démarrage du conteneur…")
         time.sleep(20)
 
