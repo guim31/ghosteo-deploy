@@ -147,6 +147,25 @@ def redeployer(cid, titre):
     return st == 200
 
 
+def menage_images(garder=3):
+    """Retire les images du back-office au-delà des `garder` plus récentes, et les couches orphelines.
+
+    Chaque mise en ligne tire une image de 842 Mo et rien ne les retirait : le 23/09/2026,
+    control-01 en gardait 28 et son disque était à 87 %. On garde celle en service et les deux
+    précédentes — de quoi revenir en arrière sans rien tirer ; au-delà, ghcr les conserve.
+    Une image encore utilisée par un conteneur refuse de partir : l'échec est sans conséquence.
+    """
+    sortie = sh(f"""avant=$(df --output=avail -B1M / | tail -1)
+docker images {DEPOT} --format '{{{{.CreatedAt}}}}|{{{{.Repository}}}}:{{{{.Tag}}}}' | grep ':main-' \\
+  | sort -r | tail -n +{garder + 1} | cut -d'|' -f2 | xargs -r docker rmi >/dev/null 2>&1
+docker image prune -f >/dev/null 2>&1
+apres=$(df --output=avail -B1M / | tail -1)
+echo "$(( apres - avant )) $(df --output=pcent / | tail -1 | tr -d ' ')"
+""", tolerant=True).split()
+    if len(sortie) == 2 and int(sortie[0]) > 0:
+        log(f"  ménage des images : {int(sortie[0])} Mo libérés, disque à {sortie[1]}")
+
+
 def mettre_en_ligne(etiquette, force=False):
     cid, env, actuelle = service()
     if not actuelle:
@@ -174,6 +193,7 @@ def mettre_en_ligne(etiquette, force=False):
         log(f"ghosteo.eu en ligne sur {etiquette}, sain, /up et /login à 200")
         if os.path.exists(ECHEC):
             os.unlink(ECHEC)
+        menage_images()
         return True
 
     # Retour arrière. La base n'est pas restaurée d'office : une restauration écraserait ce

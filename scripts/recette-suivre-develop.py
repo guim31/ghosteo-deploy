@@ -124,6 +124,11 @@ docker exec "$D" docker pull """ + IMAGE + """ >/dev/null 2>&1 && echo TIRE || e
                     and (etat[0] != conteneur_avant or not recreation_attendue)):
                 log("recette recréée, saine, sur la dernière image de develop" if recreation_attendue
                     else "recette saine ; image inchangée, rien n'avait à être recréé")
+                # Chaque image de develop remplacée reste sur le disque, sans étiquette : treize
+                # s'étaient accumulées sur control-01 au 23/09/2026. La recette étant saine sur
+                # la nouvelle, les anciennes ne servent plus à rien.
+                if recreation_attendue:
+                    sh("docker image prune -f >/dev/null 2>&1", tolerant=True)
                 return
             time.sleep(10)
         log("ATTENTION : la recette n'est pas revenue saine sur la nouvelle image en 10 minutes")
