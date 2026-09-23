@@ -147,9 +147,10 @@ def main():
         die("l'agent ne répond pas encore depuis control-01 ; relancer avec --verifier dans une minute")
 
     print()
-    print("À saisir dans le back-office, Réglages → Serveurs → " + args.nom + " :")
-    print(f"  Adresse de l'agent de métriques : {ip}")
-    print(f"  Port : {PORT}")
+    print("À saisir dans le back-office, Réglages → Serveurs → " + args.nom + " (bas du formulaire) :")
+    print(f"  Adresse privée de l'agent de métriques : {ip}")
+    print(f"  Port de l'agent : {PORT}")
+    print("  (ne pas toucher au champ « Adresse IP » : c'est l'adresse publique, cible des DNS)")
 
 
 if __name__ == "__main__":
