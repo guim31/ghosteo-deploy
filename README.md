@@ -16,7 +16,12 @@ puis les scripts d'installation des serveurs.
   Docker ni Dokploy (le panneau les installe en attachant le serveur).
 - [`scripts/create-server.py`](scripts/create-server.py) — crée un serveur chez Scaleway (groupe de
   sécurité, IP fixe, machine, cloud-init) ; `scripts/scw.py` est le mini client d'API qu'il utilise.
-  La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink.
+  La clé d'API reste dans `~/.config/scw/config.yaml` sur le Beelink. Il imprime en fin de course
+  les étapes qui suivent l'attachement à Dokploy.
+- [`scripts/activer-metriques.py`](scripts/activer-metriques.py) — **active l'agent de métriques
+  Dokploy** d'un serveur (même configuration que worker-01), vérifie que le back-office le lit par
+  le réseau privé et imprime l'adresse à saisir dans Réglages → Serveurs. `--verifier` ne fait que
+  lire. À lancer pour **chaque nouveau serveur** : worker-02 était resté sans relevé faute de ce geste.
 - [`scripts/archive-vps.sh`](scripts/archive-vps.sh) — **archive finale** du VPS OVH avant sa
   résiliation, dans un dépôt à part et **sans rétention** : la sauvegarde nocturne purge à
   30 jours, une archive définitive posée à côté d'elle disparaîtrait donc toute seule.

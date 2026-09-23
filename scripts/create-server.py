@@ -288,6 +288,19 @@ def main():
     if args.reseau_prive:
         attacher_reseau_prive(server["id"], args.reseau_prive)
 
+    # La suite ne dépend plus de Scaleway. L'agent de métriques a été oublié sur worker-02
+    # (21/09/2026) : sans lui, le moniteur affiche « Aucun relevé » pour ce serveur.
+    print(f"""
+Suite, une fois la machine attachée à Dokploy (server.create puis server.setup) :
+
+  1. adresse Let's Encrypt de Traefik : server.setup laisse test@localhost.com dans
+     /etc/dokploy/traefik/traefik.yml — la remplacer, puis redémarrer Traefik ;
+  2. agent de métriques : scripts/activer-metriques.py {args.name}
+     (active l'agent, vérifie la lecture depuis le back-office, imprime l'adresse à saisir) ;
+  3. back-office, Réglages → Serveurs : créer le serveur ({ip['address']}, identifiant Dokploy,
+     capacité) avec l'adresse d'agent imprimée à l'étape 2.
+""")
+
 
 if __name__ == "__main__":
     main()
